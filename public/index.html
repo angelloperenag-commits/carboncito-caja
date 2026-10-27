@@ -1310,10 +1310,18 @@ function refreshSend() {
 }
 /* ---------- envío del pedido a la caja ---------- */
 let sending = false;
+/* un pedido por minuto (el servidor también lo revisa) */
+const LAST_KEY = "carboncito-ultimo-pedido";
+function waitLeft() {
+  let t = 0; try { t = Number(localStorage.getItem(LAST_KEY)) || 0; } catch (e) {}
+  return Math.ceil((60e3 - (Date.now() - t)) / 1000);
+}
 function submitOrder() {
   if (sending) return;
-  sending = true;
   const btn = document.getElementById("send"), box = document.getElementById("cart-err");
+  const left = waitLeft();
+  if (left > 0) { box.textContent = `Ya recibimos un pedido tuyo. Espera ${left} segundos para mandar otro.`; box.hidden = false; return; }
+  sending = true;
   btn.textContent = "Enviando…"; btn.classList.add("off");
   const body = {
     items: cart.map(l => ({ id: l.id, opt: l.opt, sauces: l.sauces, off: l.off, qty: l.qty })),
@@ -1326,6 +1334,7 @@ function submitOrder() {
     .then(({ ok, d }) => {
       sending = false;
       if (!ok || !d.ok) { box.textContent = d.error || "No se pudo enviar el pedido."; box.hidden = false; btn.classList.remove("off"); refreshSend(); return; }
+      try { localStorage.setItem(LAST_KEY, String(Date.now())); } catch (e) {}
       /* el total que vale es el que recalculó el servidor */
       const total = typeof d.total === "number" ? money(d.total) : totalTxt(totals());
       lastOrder = { folio: d.folio, total, when: new Date(), form: Object.assign({}, form),

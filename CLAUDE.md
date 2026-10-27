@@ -33,6 +33,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Transferencias SPEI a la CLABE **1275 4001 3091 452136** (constante `CLABE` en el menú). Se muestra con botón Copiar en "Tu pedido" y en la pantalla de pedido enviado, con el botón "Mandar captura por WhatsApp" que lleva el folio. La caja recuerda revisar en el banco que llegó antes de preparar.
 - Ticket de compra: el cliente elige No / Por correo / PDF. "Por correo" manda `cliente.email` (validado en `shared/core.mjs`) y la caja lo muestra para enviarlo a mano: el sitio no manda correos. "PDF" lo genera el menú con jsPDF después de que la caja acepta el pedido, con el folio y el total que regresó el servidor.
 - Los datos del cliente se guardan en su teléfono con fecha (`savedAt`) y caducan a los 30 días. Botón "Borrar mis datos". El efectivo y las notas se limpian después de cada pedido.
+- Un pedido por minuto: el servidor responde 429 si la misma IP ya mandó uno hace menos de 60 s (guarda un hash de la IP en `limite/…`, nunca la IP). El menú también lo revisa con `localStorage`. Personas distintas en la misma red (o la misma IP del operador celular) comparten la espera.
 
 ## Menú: datos del negocio
 
@@ -43,7 +44,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 ## Pendiente
 
-- Subir estos cambios a la rama `pruebas` de GitHub, conectar el repositorio al proyecto `elcarboncito` de Netlify (para conservar la dirección y el QR), activar el branch deploy de `pruebas`, crear `CAJA_PIN` y probar en el iPad real con la caja de pruebas. Cuando todo funcione, pasar `pruebas` → `main`.
+- Probar la caja en el iPad real: el sitio de pruebas es privado y el inicio de sesión de Netlify no carga en iOS 12, así que el iPad solo puede abrir la caja de producción.
 - Revisar `public/caja/app.js` con acorn (ES2017) y esbuild (`safari12`): el último cambio solo agregó concatenación de cadenas en `clienteHTML`, pero no se pudo correr Node en la computadora donde se hizo.
 - Limitar intentos de PIN en `/api/pedidos` (hoy no hay límite y un PIN corto se puede adivinar). Mientras tanto, usar un `CAJA_PIN` de al menos 8 dígitos.
 - frakOs (sistema propio para equipos viejos) es investigación a largo plazo, fuera de este repositorio.

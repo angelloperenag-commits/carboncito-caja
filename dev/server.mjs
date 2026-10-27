@@ -18,7 +18,7 @@ http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (url.pathname.startsWith("/api/")) {
     const chunks = []; for await (const c of req) chunks.push(c);
-    const r = await handle(new Request(url, { method: req.method, headers: req.headers, body: chunks.length ? Buffer.concat(chunks) : undefined }), store, PIN);
+    const r = await handle(new Request(url, { method: req.method, headers: req.headers, body: chunks.length ? Buffer.concat(chunks) : undefined }), store, PIN, req.socket.remoteAddress);
     res.writeHead(r.status, Object.fromEntries(r.headers)); res.end(await r.text()); return;
   }
   let f = path.join(root, decodeURIComponent(url.pathname));

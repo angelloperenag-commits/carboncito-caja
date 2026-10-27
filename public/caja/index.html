@@ -345,6 +345,9 @@ pre.summary { white-space: pre-wrap; font-family: Menlo, monospace; font-size: 1
   /* baja la caja para que la franja no tape la barra superior */
   var app = document.querySelector(".app");
   if (app) app.style.top = b.offsetHeight + "px";
+  var st = document.createElement("style");
+  st.appendChild(document.createTextNode(".overlay{top:" + b.offsetHeight + "px}"));
+  document.head.appendChild(st);
   document.title = "[PRUEBAS] " + document.title;
 })();
 </script>

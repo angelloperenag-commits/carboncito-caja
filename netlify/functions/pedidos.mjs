@@ -7,7 +7,7 @@ export default async (req, context) => {
   const ctx = (context && context.deploy && context.deploy.context) || process.env.CONTEXT || "production";
   const store = getStore({ name: ctx === "production" ? "pedidos" : "pedidos-pruebas", consistency: "strong" });
   const pin = (globalThis.Netlify && Netlify.env.get("CAJA_PIN")) || process.env.CAJA_PIN || "";
-  return handle(req, store, pin);
+  return handle(req, store, pin, (context && context.ip) || "");
 };
 
 export const config = { path: ["/api/pedidos", "/api/pedidos/estado"] };

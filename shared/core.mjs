@@ -128,8 +128,15 @@ export async function cambiarEstado(store, key, estado, extra = {}, now = new Da
   return p;
 }
 
+/* Un pedido por minuto desde la misma conexión. Se guarda un resumen (hash) de la IP, no la IP. */
+export const ESPERA_MS = 60e3;
+async function claveIP(ip) {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("carboncito:" + ip));
+  return "limite/" + [...new Uint8Array(h)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /* Maneja la petición HTTP; lo usan Netlify y el servidor local */
-export async function handle(req, store, pin) {
+export async function handle(req, store, pin, ip = "") {
   const url = new URL(req.url);
   const json = (data, status = 200) => new Response(JSON.stringify(data), {
     status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
@@ -141,7 +148,18 @@ export async function handle(req, store, pin) {
       if (len > 20000) return json({ error: "El pedido es demasiado grande." }, 413);
       const body = await req.json().catch(() => null);
       if (body && body.website) return json({ ok: true, folio: 0 }); /* trampa para robots */
+      normalizeOrder(body); /* un pedido con errores no cuenta para la espera */
+      const lim = ip ? await claveIP(ip) : "";
+      if (lim) {
+        const prev = await store.get(lim, { type: "json" });
+        const falta = prev ? ESPERA_MS - (Date.now() - prev.t) : 0;
+        if (falta > 0) {
+          const s = Math.ceil(falta / 1000);
+          return json({ error: `Ya recibimos un pedido tuyo. Espera ${s} segundos para mandar otro.`, espera: s }, 429);
+        }
+      }
       const p = await crearPedido(store, body);
+      if (lim) await store.setJSON(lim, { t: Date.now() });
       return json({ ok: true, folio: p.folio, total: p.total });
     }
     if (!pin) return json({ error: "Falta configurar CAJA_PIN en Netlify." }, 500);

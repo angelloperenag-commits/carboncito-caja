@@ -425,6 +425,14 @@ button.prow:focus-visible, button.chip:focus-visible, .stepper button:focus-visi
 .seg-btn { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; padding: 6px 8px; border-radius: 11px; font: 600 15px var(--font-body); color: var(--ink-soft); text-align: center; }
 .seg-btn svg { width: 20px; height: 20px; flex: none; }
 .seg-btn.on { background: var(--orange); color: #fff8ee; }
+.seg.three { grid-template-columns: repeat(3, 1fr); }
+.pickup.transfer { display: grid; gap: 8px; }
+.pickup.transfer strong { color: var(--ink); }
+.done-transfer { width: 100%; text-align: left; }
+.clabe { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #fffdf8; border: 1px dashed rgba(176, 74, 36, .45); }
+.clabe b { white-space: nowrap; min-width: 0; font: 700 17px var(--font-name); letter-spacing: .06em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.copy-clabe { all: unset; cursor: pointer; flex: none; padding: 7px 12px; border-radius: 999px; background: var(--terra); color: #fff8ee; font: 600 13px var(--font-body); }
+.copy-clabe:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 .fields { display: grid; gap: 6px; }
 .fields > div { display: grid; gap: 6px; }
 .fields label { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-top: 4px; }
@@ -655,7 +663,9 @@ button.prow:focus-visible, button.chip:focus-visible, .stepper button:focus-visi
   <span class="cb-total" id="cb-total">$0</span>
 </button>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<!-- librerías servidas desde el propio sitio (qrcode-generator 1.4.4 y jsPDF 4.2.1, verificadas con el SRI de cdnjs) -->
+<script src="js/qrcode.min.js"></script>
+<script src="js/jspdf.umd.min.js" defer></script>
 <script>
 /* =========================================================
    INGREDIENTES
@@ -1108,9 +1118,25 @@ const lineKey = (id, opt, sauces, off) => [id, opt, sauces.join("+"), [...off].s
 let cart = store.get("carbon-cart-v2", []).filter(l => {
   const p = prod(l.id);
   return p && p.prices[l.opt] && Array.isArray(l.sauces) && Array.isArray(l.off)
-    && l.sauces.every(sauceById) && l.off.every(id => p.recipe.includes(id) && !p.fixed.includes(id));
+    && l.sauces.every(sauceById) && l.off.every(id => p.recipe.includes(id) && !p.fixed.includes(id))
+    && Number.isInteger(l.qty) && l.qty >= 1 && l.qty <= 30;
 });
-let form = Object.assign({ mode: "domicilio", name: "", phone: "", addr: "", refs: "", pay: "efectivo", cash: "", notes: "" }, store.get("carbon-form", {}));
+/* datos del cliente: se recuerdan en este teléfono solo 30 días y se pueden borrar desde "Tu pedido" */
+const FORM_DEFAULTS = { mode: "domicilio", name: "", phone: "", addr: "", refs: "", pay: "efectivo", cash: "", notes: "", ticket: "no", email: "" };
+const FORM_DAYS = 30;
+function loadForm() {
+  const f = store.get("carbon-form", {});
+  if (!f || typeof f !== "object" || !f.savedAt || Date.now() - f.savedAt > FORM_DAYS * 864e5) { try { localStorage.removeItem("carbon-form"); } catch (e) {} return {}; }
+  const out = {};
+  Object.keys(FORM_DEFAULTS).forEach(k => { if (typeof f[k] === "string") out[k] = f[k]; });
+  return out;
+}
+function saveForm() { store.set("carbon-form", Object.assign({}, form, { savedAt: Date.now() })); }
+let form = Object.assign({}, FORM_DEFAULTS, loadForm());
+/* cuenta para transferencias (SPEI) */
+const CLABE = "127540013091452136", CLABE_TXT = "1275 4001 3091 452136";
+const emailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.trim());
+const clabeHTML = () => `<div class="clabe"><b class="clabe-num">${CLABE_TXT}</b><button type="button" class="copy-clabe">Copiar</button></div>`;
 const lineInfo = l => { const p = prod(l.id); return { p, price: p.prices[l.opt][1], parts: custParts(p, l) }; };
 function totals() {
   let sum = 0, count = 0;
@@ -1174,15 +1200,29 @@ function cartHTML() {
         <label for="c-cash">¿Con cuánto pagas? <small>(opcional, para llevarte cambio)</small></label>
         <input id="c-cash" data-f="cash" inputmode="numeric" placeholder="Ej. 500" value="${esc(form.cash)}">
       </div>
-      <p class="pickup" id="transfer-box" ${form.pay === "transferencia" ? "" : "hidden"}>Te mandamos los datos para transferir por WhatsApp.</p>
+      <div class="pickup transfer" id="transfer-box" ${form.pay === "transferencia" ? "" : "hidden"}>
+        <span>Transfiere a esta cuenta CLABE (SPEI):</span>
+        ${clabeHTML()}
+        <span>Después de transferir, <strong>manda la captura de tu transferencia</strong> por WhatsApp al 777 113 8935 con tu número de folio.</span>
+      </div>
     </div>
     <div class="fields">
       <label for="c-notes">Notas <small>(opcional)</small></label>
       <textarea id="c-notes" data-f="notes" rows="2" placeholder="Ej. bien dorada, sin servilletas">${esc(form.notes)}</textarea>
     </div>
+    <div class="spec"><h4>¿Quieres ticket de compra?</h4>
+      <div class="seg three" role="radiogroup" aria-label="Ticket de compra">${seg("ticket", "no", "No")}${seg("ticket", "correo", "Por correo")}${seg("ticket", "pdf", "PDF")}</div>
+      <div class="fields" id="email-box" ${form.ticket === "correo" ? "" : "hidden"}>
+        <label for="c-email">Correo</label>
+        <input id="c-email" data-f="email" type="email" inputmode="email" autocomplete="email" placeholder="tu@correo.com" value="${esc(form.email)}">
+        <p class="mini">Te mandamos tu ticket a este correo cuando confirmemos tu pedido.</p>
+      </div>
+      <p class="pickup" id="pdf-box" ${form.ticket === "pdf" ? "" : "hidden"}>Al enviar tu pedido se descarga tu ticket en PDF.</p>
+    </div>
     <p class="err" id="cart-err" hidden></p>
     <button type="button" class="btn add send" id="send">Enviar pedido · ${totalTxt(totals())}</button>
-    <p class="fine">Tu pedido llega directo a la cocina. Te confirmamos por WhatsApp.</p>`;
+    <p class="fine">Tu pedido llega directo a la cocina. Te confirmamos por WhatsApp.</p>
+    <p class="fine">Tu nombre y dirección se recuerdan en este teléfono por ${FORM_DAYS} días. <button type="button" class="edit" id="forget">Borrar mis datos</button></p>`;
 }
 const PAY_ICON = {
   cash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>`,
@@ -1198,9 +1238,59 @@ function buildMessage() {
   L.push(`Entrega: ${form.mode === "domicilio" ? "A domicilio" : "Paso a recoger"}`);
   L.push(`Nombre: ${form.name.trim()}`);
   if (form.mode === "domicilio") { L.push(`Dirección: ${form.addr.trim()}`); if (form.refs.trim()) L.push(`Referencias: ${form.refs.trim()}`); }
-  L.push(`Pago: ${form.pay === "efectivo" ? "Efectivo" + (form.cash.trim() ? ` (pago con $${form.cash.trim()})` : "") : "Transferencia"}`);
+  L.push(`Pago: ${form.pay === "efectivo" ? "Efectivo" + (form.cash.trim() ? ` (pago con $${form.cash.trim()})` : "") : "Transferencia a CLABE " + CLABE_TXT + ". Te mando la captura en este chat."}`);
+  L.push(`Ticket: ${form.ticket === "correo" ? "Por correo a " + form.email.trim() : form.ticket === "pdf" ? "PDF" : "No"}`);
   if (form.notes.trim()) L.push(`Notas: ${form.notes.trim()}`);
   return L.join("\n");
+}
+/* ticket de compra en PDF (tira de 80 mm). Usa una copia del pedido ya enviado y el folio que dio la caja. */
+function ticketPDF(s) {
+  const { jsPDF } = window.jspdf;
+  const W = 80, M = 6, CW = W - M * 2, f = s.form;
+  const draw = doc => {
+    let y = 10;
+    const text = (t, size, style, align) => {
+      doc.setFont("helvetica", style || "normal"); doc.setFontSize(size);
+      doc.splitTextToSize(String(t), CW).forEach(ln => { doc.text(ln, align === "center" ? W / 2 : M, y, { align: align || "left" }); y += size * .42; });
+    };
+    const row = (l, r, size, style) => {
+      doc.setFont("helvetica", style || "normal"); doc.setFontSize(size);
+      doc.splitTextToSize(String(l), CW - 22).forEach((ln, i) => { doc.text(ln, M, y); if (i === 0) doc.text(String(r), W - M, y, { align: "right" }); y += size * .42; });
+    };
+    const rule = () => { y += 1; doc.setLineDashPattern([1, 1], 0); doc.line(M, y, W - M, y); y += 4; };
+    text("EL CARBONCITO", 16, "bold", "center");
+    text("Hamburguesas", 9, "normal", "center");
+    text("Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos", 7.5, "normal", "center");
+    text("Pedidos: 777 113 8935", 7.5, "normal", "center");
+    rule();
+    row("Folio", "#" + s.folio, 8.5, "bold");
+    row("Fecha", s.when.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }), 8.5);
+    rule();
+    s.lines.forEach(l => { row(`${l.qty} x ${l.name}`, money(l.price * l.qty), 9, "bold"); if (l.parts.length) text(l.parts.join(" · "), 7.5); y += 1; });
+    rule();
+    row("TOTAL", s.total, 12, "bold");
+    rule();
+    text(`Entrega: ${f.mode === "domicilio" ? "A domicilio" : "Paso a recoger"}`, 8);
+    text(`Nombre: ${f.name.trim()}`, 8);
+    text(`Teléfono: ${f.phone.trim()}`, 8);
+    if (f.mode === "domicilio") { text(`Dirección: ${f.addr.trim()}`, 8); if (f.refs.trim()) text(`Referencias: ${f.refs.trim()}`, 8); }
+    if (f.pay === "efectivo") text(`Pago: Efectivo${f.cash.trim() ? ` (paga con $${f.cash.trim()})` : ""}`, 8);
+    else { text("Pago: Transferencia (SPEI)", 8); text(`CLABE: ${CLABE_TXT}`, 8, "bold"); text("Manda la captura de tu transferencia por WhatsApp al 777 113 8935 con tu folio.", 7.5); }
+    if (f.notes.trim()) text(`Notas: ${f.notes.trim()}`, 8);
+    rule();
+    text("¡Gracias por tu compra!", 10, "bold", "center");
+    text("Este ticket no es un comprobante fiscal.", 6.5, "normal", "center");
+    return y + 6;
+  };
+  const h = draw(new jsPDF({ unit: "mm", format: [W, 1000] }));
+  const doc = new jsPDF({ unit: "mm", format: [W, Math.max(h, 100)] });
+  draw(doc);
+  return doc;
+}
+let lastOrder = null;
+function saveTicket() {
+  if (!lastOrder) return false;
+  try { ticketPDF(lastOrder).save(`ticket-el-carboncito-${lastOrder.folio}.pdf`); return true; } catch (e) { console.error(e); return false; }
 }
 function cartProblems() {
   const errs = [];
@@ -1208,6 +1298,7 @@ function cartProblems() {
   if (!form.name.trim()) errs.push(["c-name", "Escribe tu nombre."]);
   if (form.phone.replace(/\D/g, "").length < 10) errs.push(["c-phone", "Escribe tu teléfono a 10 dígitos."]);
   if (form.mode === "domicilio" && !form.addr.trim()) errs.push(["c-addr", "Escribe la dirección de entrega."]);
+  if (form.ticket === "correo" && !emailOk(form.email)) errs.push(["c-email", "Escribe un correo válido para tu ticket."]);
   return errs;
 }
 function refreshSend() {
@@ -1226,7 +1317,7 @@ function submitOrder() {
   btn.textContent = "Enviando…"; btn.classList.add("off");
   const body = {
     items: cart.map(l => ({ id: l.id, opt: l.opt, sauces: l.sauces, off: l.off, qty: l.qty })),
-    cliente: { mode: form.mode, name: form.name, phone: form.phone, addr: form.addr, refs: form.refs, pay: form.pay, cash: form.cash, notes: form.notes },
+    cliente: { mode: form.mode, name: form.name, phone: form.phone, addr: form.addr, refs: form.refs, pay: form.pay, cash: form.cash, notes: form.notes, ticket: form.ticket, email: form.ticket === "correo" ? form.email : "" },
   };
   const waMsg = buildMessage();
   const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("net")), 15000));
@@ -1235,9 +1326,15 @@ function submitOrder() {
     .then(({ ok, d }) => {
       sending = false;
       if (!ok || !d.ok) { box.textContent = d.error || "No se pudo enviar el pedido."; box.hidden = false; btn.classList.remove("off"); refreshSend(); return; }
-      const total = totalTxt(totals());
+      /* el total que vale es el que recalculó el servidor */
+      const total = typeof d.total === "number" ? money(d.total) : totalTxt(totals());
+      lastOrder = { folio: d.folio, total, when: new Date(), form: Object.assign({}, form),
+        lines: cart.map(l => { const i = lineInfo(l); return { qty: l.qty, name: i.p.name, price: i.price, parts: i.parts }; }) };
       cart = []; saveCart();
+      /* lo que es solo de este pedido no se guarda para el siguiente */
+      form.cash = ""; form.notes = ""; saveForm();
       sheet.innerHTML = doneHTML(d.folio, total, waMsg); sheet.scrollTop = 0;
+      if (lastOrder.form.ticket === "pdf") saveTicket();
       document.getElementById("done-ok").focus({ preventScroll: true });
     })
     .catch(() => {
@@ -1253,7 +1350,15 @@ function doneHTML(folio, total, waMsg) {
       <div class="done-check" aria-hidden="true">✓</div>
       <h2 id="sheet-title">¡Pedido enviado!</h2>
       <p class="done-folio">Folio <b>#${folio}</b> · ${esc(total)}</p>
-      <p class="lead">Ya llegó a la cocina. Te confirmamos por WhatsApp al ${esc(form.phone)}.</p>
+      <p class="lead">Ya llegó a la cocina. Te confirmamos por WhatsApp al ${esc(lastOrder.form.phone)}.</p>
+      ${lastOrder.form.pay === "transferencia" ? `<div class="pickup transfer done-transfer">
+        <span>Transfiere <strong>${esc(total)}</strong> a esta cuenta CLABE (SPEI):</span>
+        ${clabeHTML()}
+        <span>Cuando transfieras, <strong>mándanos la captura</strong> con tu folio a este WhatsApp:</span>
+        <a class="btn wa" href="https://wa.me/${WA}?text=${encodeURIComponent("Hola, te mando la captura de la transferencia del pedido #" + folio + ".")}" target="_blank" rel="noopener">Mandar captura por WhatsApp</a>
+      </div>` : ""}
+      ${lastOrder.form.ticket === "pdf" ? `<button type="button" class="btn" id="get-ticket">Descargar mi ticket (PDF)</button>` : ""}
+      ${lastOrder.form.ticket === "correo" ? `<p class="mini">Te mandamos tu ticket a ${esc(lastOrder.form.email)} cuando confirmemos tu pedido.</p>` : ""}
       <button type="button" class="btn add" id="done-ok">Listo</button>
       <a class="done-wa" href="${wa}" target="_blank" rel="noopener">¿Quieres avisarnos también por WhatsApp?</a>
     </div>`;
@@ -1370,14 +1475,32 @@ document.addEventListener("click", e => {
   }
   const sg = t.closest("[data-seg]");
   if (sg) {
-    form[sg.dataset.seg] = sg.dataset.val; store.set("carbon-form", form);
+    form[sg.dataset.seg] = sg.dataset.val; saveForm();
     sheet.querySelectorAll(`[data-seg="${sg.dataset.seg}"]`).forEach(b => { const on = b === sg; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
     document.getElementById("addr-box").hidden = form.mode !== "domicilio";
     document.getElementById("pickup-box").hidden = form.mode !== "recoger";
     document.getElementById("cash-box").hidden = form.pay !== "efectivo";
     document.getElementById("transfer-box").hidden = form.pay !== "transferencia";
+    document.getElementById("email-box").hidden = form.ticket !== "correo";
+    document.getElementById("pdf-box").hidden = form.ticket !== "pdf";
     return refreshSend();
   }
+  if (t.closest("#forget")) {
+    form = Object.assign({}, FORM_DEFAULTS);
+    try { localStorage.removeItem("carbon-form"); } catch (err) {}
+    swapSheet(true);
+    const fg = document.getElementById("forget"); if (fg) { fg.textContent = "Datos borrados"; fg.focus({ preventScroll: true }); }
+    return;
+  }
+  const cc = t.closest(".copy-clabe");
+  if (cc) {
+    const num = cc.parentNode.querySelector(".clabe-num");
+    const ok = () => { cc.textContent = "Copiada"; setTimeout(() => cc.textContent = "Copiar", 2000); };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents(num); const s = getSelection(); s.removeAllRanges(); s.addRange(r); cc.textContent = "Selecciónala"; };
+    try { navigator.clipboard.writeText(CLABE).then(ok, fallback); } catch (err) { fallback(); }
+    return;
+  }
+  if (t.closest("#get-ticket")) { if (!saveTicket()) t.closest("#get-ticket").textContent = "No se pudo crear el PDF"; return; }
   if (t.closest("#send")) {
     const errs = cartProblems(), box = document.getElementById("cart-err");
     sheet.querySelectorAll(".bad").forEach(x => x.classList.remove("bad"));
@@ -1395,7 +1518,7 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("input", e => {
   const f = e.target.dataset && e.target.dataset.f; if (!f) return;
-  form[f] = e.target.value; store.set("carbon-form", form);
+  form[f] = e.target.value; saveForm();
   e.target.classList.remove("bad"); refreshSend();
 });
 renderBar();
@@ -1443,6 +1566,19 @@ try { const q = qrcode(0, "M"); q.addData(ARTIFACT_URL); q.make(); document.getE
 
 
 
+</script>
+<script>
+/* Aviso en el sitio de pruebas (rama "pruebas", vistas previas o la computadora): esos pedidos no llegan a la cocina */
+(function () {
+  var h = location.hostname;
+  if (h.indexOf("--") === -1 && h !== "localhost" && h !== "127.0.0.1") return;
+  var b = document.createElement("div");
+  b.textContent = "SITIO DE PRUEBAS · estos pedidos no llegan a la cocina";
+  b.setAttribute("role", "status");
+  b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:100;padding:6px 12px calc(6px);padding-top:calc(6px + env(safe-area-inset-top,0px));text-align:center;font:700 12px/1.3 Archivo,system-ui,sans-serif;letter-spacing:.08em;color:#fff;background:repeating-linear-gradient(135deg,#b3261e 0 14px,#8a1c16 14px 28px);pointer-events:none";
+  document.body.appendChild(b);
+  document.title = "[PRUEBAS] " + document.title;
+})();
 </script>
 
 </body></html>

@@ -30,6 +30,8 @@ export const SAUCES = {
 export const ESTADOS = ["nuevo", "aceptado", "listo", "entregado", "rechazado"];
 const MODES = { domicilio: "A domicilio", recoger: "Pasa a recoger" };
 const PAYS = { efectivo: "Efectivo", transferencia: "Transferencia" };
+const TICKETS = { no: "Sin ticket", correo: "Ticket por correo", pdf: "Ticket en PDF (lo descargó el cliente)" };
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const str = (v, max) => String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
 
@@ -66,7 +68,11 @@ export function normalizeOrder(body) {
     direccion: mode === "domicilio" ? str(c.addr, 200) : "", referencias: mode === "domicilio" ? str(c.refs, 160) : "",
     pago: PAYS[c.pay] ? c.pay : "efectivo", pagaCon: Math.max(0, Math.floor(Number(String(c.cash || "").replace(/[^\d.]/g, "")) || 0)),
     notas: str(c.notes, 300),
+    ticket: TICKETS[c.ticket] ? c.ticket : "no",
   };
+  cliente.ticketLabel = TICKETS[cliente.ticket];
+  cliente.email = cliente.ticket === "correo" ? str(c.email, 120) : "";
+  if (cliente.ticket === "correo" && !EMAIL.test(cliente.email)) throw new Error("Falta un correo válido para el ticket.");
   if (!cliente.nombre) throw new Error("Falta el nombre.");
   if (cliente.telefono.replace(/\D/g, "").length < 10) throw new Error("Falta un teléfono de 10 dígitos.");
   if (mode === "domicilio" && !cliente.direccion) throw new Error("Falta la dirección.");

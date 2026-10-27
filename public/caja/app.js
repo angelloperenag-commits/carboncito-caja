@@ -637,10 +637,11 @@
   }
   function clienteHTML(p) {
     var c = p.cliente;
-    var pago = c.pago === "efectivo" ? "Efectivo" + (c.pagaCon ? " · paga con " + money(c.pagaCon) + " · cambio " + money(c.pagaCon - p.total) : "") : "Transferencia";
+    var pago = c.pago === "efectivo" ? "Efectivo" + (c.pagaCon ? " · paga con " + money(c.pagaCon) + " · cambio " + money(c.pagaCon - p.total) : "") : "Transferencia · <b>revisa en el banco que llegó antes de prepararlo</b>";
+    var ticket = c.ticket === "correo" ? "<p><b>Ticket:</b> mandarlo a " + esc(c.email) + "</p>" : c.ticket === "pdf" ? "<p><b>Ticket:</b> el cliente descargó su PDF</p>" : "";
     return '<div class="cli"><p><b>' + esc(c.nombre) + '</b> · <a href="tel:' + esc(c.telefono.replace(/\s/g, "")) + '">' + esc(c.telefono) + "</a></p>" +
       "<p><b>" + esc(c.entregaLabel) + "</b>" + (c.direccion ? ": " + esc(c.direccion) : "") + (c.referencias ? " <span class='note'>(" + esc(c.referencias) + ")</span>" : "") + "</p>" +
-      "<p><b>Pago:</b> " + pago + "</p>" + (c.notas ? '<p class="nota">Nota: ' + esc(c.notas) + "</p>" : "") + "</div>";
+      "<p><b>Pago:</b> " + pago + "</p>" + ticket + (c.notas ? '<p class="nota">Nota: ' + esc(c.notas) + "</p>" : "") + "</div>";
   }
   function actionsHTML(p) {
     if (ped.ask === "rechazar-" + p.key) {

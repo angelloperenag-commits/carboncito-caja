@@ -11,6 +11,15 @@
 3. En **Project configuration → Environment variables**, crear `CAJA_PIN` con un número que solo sepa el negocio (por ejemplo 4 a 6 dígitos).
 4. Hacer el deploy. Cada deploy gasta créditos del plan gratis (unos 15 de 300 al mes), así que conviene juntar cambios.
 
+## Sitio de pruebas (rama `pruebas`)
+
+Se trabaja en la rama `pruebas` y solo se pasa a `main` lo que ya funciona.
+
+1. En GitHub, crea la rama `pruebas` desde `main`.
+2. En Netlify: **Project configuration → Build & deploy → Continuous deployment → Branches and deploy contexts → Configure**. En *Branch deploys* elige **Let me add individual branches**, escribe `pruebas` y guarda.
+3. Cada cambio que llega a `pruebas` se publica solo en `https://pruebas--elcarboncito.netlify.app` (y la caja de pruebas en `/caja/`). Tiene una franja roja de "PRUEBAS" y sus pedidos se guardan aparte de los reales.
+4. Cuando esté bien, en GitHub abre un **Pull request** de `pruebas` → `main` y dale **Merge**. Eso publica la versión para los clientes.
+
 ## Usar la caja
 
 1. En el iPad, abrir `https://<tu-sitio>.netlify.app/caja/` en Safari.

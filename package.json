@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Menú web y caja de El Carboncito",
   "dependencies": {
-    "@netlify/blobs": "latest"
+    "@netlify/blobs": "11.1.4"
   }
 }

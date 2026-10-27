@@ -1,0 +1,13 @@
+{
+  "name": "Caja El Carboncito",
+  "short_name": "Caja",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#efe3cb",
+  "theme_color": "#3b2416",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

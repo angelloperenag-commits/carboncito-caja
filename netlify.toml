@@ -1,0 +1,12 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# La caja y el menú siempre en su versión más nueva
+[[headers]]
+  for = "/caja/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

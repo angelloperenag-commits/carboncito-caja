@@ -1,0 +1,9 @@
+{
+  "name": "carboncito",
+  "private": true,
+  "type": "module",
+  "description": "Menú web y caja de El Carboncito",
+  "dependencies": {
+    "@netlify/blobs": "latest"
+  }
+}

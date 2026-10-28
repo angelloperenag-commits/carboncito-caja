@@ -152,40 +152,85 @@
   }
 
   /* =========================================================
-     CUENTAS POR COBRAR (comen en el local y pagan al irse)
+     CUENTAS POR COBRAR, una por cliente y acumulables
+     (comen en el local, o llegan en coche y se les lleva a su casa)
      ========================================================= */
   function pendTotal(p) { var t = 0; p.cart.forEach(function (l) { t += l.price * l.qty; }); return t; }
   function findPend(id) { for (var i = 0; i < db.pendientes.length; i++) if (String(db.pendientes[i].id) === String(id)) return db.pendientes[i]; return null; }
+  function pendByName(nm) {
+    var k = nm.trim().toLowerCase();
+    for (var i = 0; i < db.pendientes.length; i++) if (db.pendientes[i].nota.trim().toLowerCase() === k) return db.pendientes[i];
+    return null;
+  }
+  /* suma productos a una cuenta: lo igual se junta en la misma línea */
+  function mergeLines(cart, lines) {
+    lines.forEach(function (l) {
+      for (var i = 0; i < cart.length; i++) if (cart[i].key === l.key) { cart[i].qty += l.qty; return; }
+      cart.push(JSON.parse(JSON.stringify(l)));
+    });
+  }
+  /* la dirección nueva manda; si no se escribió, se queda la que tenía la cuenta */
+  function mergeDest(p) {
+    if (state.tipo === "domicilio" && state.dir.trim()) { p.tipo = "domicilio"; p.dir = state.dir.trim(); }
+    else if (state.tipo !== "aqui" || !p.tipo) p.tipo = state.tipo;
+  }
   function resetTicket() { state.cart = []; state.nota = ""; state.tipo = "aqui"; state.dir = ""; state.fromPend = null; state.fromPedido = null; state.showTicket = false; }
   function holdTicket() {
     if (!state.cart.length) return;
     var nm = state.nota.trim();
-    if (!nm) { toast("Escribe el nombre o la mesa para guardar la cuenta"); var ni = $("nota"); if (ni) ni.focus(); return; }
-    var prev = state.fromPend ? findPend(state.fromPend) : null;
-    var rec = { id: prev ? prev.id : Date.now(), t: prev ? prev.t : new Date().toISOString(), nota: nm, tipo: state.tipo, dir: state.tipo === "domicilio" ? state.dir.trim() : "",
-      cart: JSON.parse(JSON.stringify(state.cart)) };
-    if (prev) db.pendientes[db.pendientes.indexOf(prev)] = rec; else db.pendientes.push(rec);
-    save(); resetTicket(); toast("Cuenta de " + nm + " guardada por cobrar"); render();
+    if (!nm) { toast("Escribe el nombre del cliente o la mesa para guardar la cuenta"); var ni = $("nota"); if (ni) ni.focus(); return; }
+    var prev = state.fromPend ? findPend(state.fromPend) : null, msg;
+    if (prev) {
+      /* la cuenta abierta ya trae todo lo anterior: se reemplaza con lo que hay en el ticket */
+      prev.nota = nm; prev.tipo = state.tipo; prev.dir = state.tipo === "domicilio" ? state.dir.trim() : "";
+      prev.cart = JSON.parse(JSON.stringify(state.cart));
+      msg = "Cuenta de " + nm + " guardada: " + money(pendTotal(prev));
+    } else if ((prev = pendByName(nm))) {
+      mergeLines(prev.cart, state.cart); mergeDest(prev);
+      msg = "Se sumó a la cuenta de " + prev.nota + ": " + money(pendTotal(prev));
+    } else {
+      db.pendientes.push({ id: Date.now(), t: new Date().toISOString(), nota: nm, tipo: state.tipo, dir: state.tipo === "domicilio" ? state.dir.trim() : "",
+        cart: JSON.parse(JSON.stringify(state.cart)) });
+      msg = "Cuenta de " + nm + " guardada por cobrar";
+    }
+    save(); resetTicket(); toast(msg); render();
   }
   function loadPend(id) {
     var p = findPend(id); if (!p) return;
-    if (state.cart.length && String(state.fromPend) !== String(p.id)) { toast("Primero cobra, guarda o vacía el ticket que está abierto"); return; }
+    if (state.cart.length && String(state.fromPend) !== String(p.id)) {
+      /* hay un ticket abierto: se suma a esta cuenta y se abre todo junto */
+      if (state.fromPend) { toast("Primero guarda o cobra la cuenta que está abierta"); return; }
+      mergeLines(p.cart, state.cart); mergeDest(p); save();
+      toast("Se sumó a la cuenta de " + p.nota);
+    }
     state.cart = JSON.parse(JSON.stringify(p.cart)); state.nota = p.nota; state.tipo = p.tipo; state.dir = p.dir || "";
     state.fromPend = p.id; state.fromPedido = null; state.showTicket = true; state.view = "sell";
     closeLayer(); render();
   }
   function pendHTML() {
+    var abierto = state.cart.length && !state.fromPend;
     var list = db.pendientes.slice().reverse().map(function (p) {
-      var items = p.cart.map(function (l) { return l.qty + " " + prod(l.pid).name; }).join(", ");
+      var items = p.cart.map(function (l) {
+        var d = lineDesc(l);
+        return '<p><b>' + l.qty + " × " + esc(prod(l.pid).name) + "</b>" + (d ? ' <span class="note">' + esc(d) + "</span>" : "") + '<em>' + money(l.price * l.qty) + "</em></p>";
+      }).join("");
+      var dest = p.tipo === "domicilio"
+        ? '<div class="p-dest"><span><b>Llevar a:</b> ' + (p.dir ? esc(p.dir) : "falta la dirección") + "</span>" +
+          (p.dir ? '<button type="button" class="chk" data-pendruta="' + p.id + '">Ruta (QR)</button>' : "") + "</div>"
+        : '<div class="p-dest"><span><b>Entrega:</b> ' + TIPOS[p.tipo] + "</span></div>";
       var ask = state.pendAsk === String(p.id);
-      return '<div class="sale"><div class="h"><b>' + esc(p.nota) + "</b><span>" + hora(p.t) + " · " + TIPOS[p.tipo] + "</span><strong>" + money(pendTotal(p)) + "</strong></div><small>" + esc(items) + "</small>" +
+      return '<div class="sale"><div class="h"><b>' + esc(p.nota) + "</b><span>desde las " + hora(p.t) + "</span><strong>" + money(pendTotal(p)) + "</strong></div>" +
+        '<div class="p-items">' + items + "</div>" + dest +
         (ask ? '<div class="confirm"><p>¿Borrar la cuenta de ' + esc(p.nota) + "? No se cobra ni cuenta en el corte.</p>" +
           '<div class="row2"><button type="button" class="btn ghost" data-pendno="1">No</button><button type="button" class="btn red" data-penddel="' + p.id + '">Sí, borrar</button></div></div>'
-          : '<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" data-pendask="' + p.id + '">Borrar</button><button type="button" class="btn" data-pendload="' + p.id + '">Abrir para cobrar o agregar</button></div>') + "</div>";
+          : '<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" data-pendask="' + p.id + '">Borrar</button><button type="button" class="btn" data-pendload="' + p.id + '">' +
+            (abierto ? "Sumar ticket actual (" + money(cartTotal()) + ")" : "Abrir para cobrar o agregar") + "</button></div>") + "</div>";
     }).join("");
     return '<div class="overlay"><div class="modal">' +
       '<div class="m-head"><h2>Cuentas por cobrar</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
-      '<div class="m-body" style="padding-top:12px">' + (list || '<p class="empty">No hay cuentas pendientes.</p>') + "</div></div></div>";
+      '<div class="m-body" style="padding-top:12px">' +
+      (abierto && db.pendientes.length ? '<p class="note">Elige a qué cuenta sumar el ticket que tienes abierto.</p>' : "") +
+      (list || '<p class="empty">No hay cuentas pendientes.</p>') + "</div></div></div>";
   }
 
   /* reloj */
@@ -256,7 +301,7 @@
     return '<div class="t-head"><button type="button" class="back-cat" data-act="hide-ticket">‹ Productos</button><h2>Ticket</h2><span class="folio">' +
       (state.fromPend ? "Cuenta por cobrar" : "Venta #" + db.shift.next) + "</span></div>" +
       '<div class="lines">' + lines + "</div>" +
-      '<div class="t-meta"><div class="seg">' + tipos + "</div>" + dir + '<input id="nota" type="text" placeholder="Nombre, mesa o nota" value="' + esc(state.nota) + '" autocomplete="off"></div>' +
+      '<div class="t-meta"><div class="seg">' + tipos + "</div>" + dir + '<input id="nota" type="text" placeholder="Nombre del cliente o mesa" value="' + esc(state.nota) + '" autocomplete="off"></div>' +
       '<div class="t-foot"><div class="total"><span>Total</span><b>' + money(t) + "</b></div>" +
       '<div class="row2"><button type="button" class="btn ghost" data-act="clear"' + dis + '>Vaciar</button><button type="button" class="btn ghost" data-act="hold"' + dis + '>Por cobrar</button>' +
       '<button type="button" class="btn" data-act="pay"' + dis + ">Cobrar " + money(t) + "</button></div></div>";
@@ -498,6 +543,7 @@
     /* cuentas por cobrar */
     if (state.pend) {
       if ((el = find(t, "[data-pendload]"))) return loadPend(attr(el, "data-pendload"));
+      if ((el = find(t, "[data-pendruta]"))) { var rp = findPend(attr(el, "data-pendruta")); if (rp) openRuta("Cuenta de " + rp.nota + " · " + money(pendTotal(rp)), rp.dir); return; }
       if ((el = find(t, "[data-pendask]"))) { state.pendAsk = attr(el, "data-pendask"); return renderLayer(); }
       if (find(t, "[data-pendno]")) { state.pendAsk = null; return renderLayer(); }
       if ((el = find(t, "[data-penddel]"))) {

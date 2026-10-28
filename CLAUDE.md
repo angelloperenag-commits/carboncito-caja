@@ -48,7 +48,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 - Domicilio: al elegir "Domicilio" en el ticket aparece un campo para la dirección o un enlace de Google Maps. "Buscar en Maps" abre Google Maps en Safari; en Maps se toca el lugar → Compartir → Copiar y se pega en el campo. La dirección se guarda en la venta (`dir`).
 - Ruta de entrega: como WhatsApp no corre en el iPad con iOS 12, la caja muestra un código QR con la ruta de Google Maps para que el repartidor lo escanee con su celular. Aparece al registrar una venta a domicilio, en el detalle de la venta, en los pedidos web a domicilio (botón "Ruta (QR)") y sola al marcar un pedido web como "Ya está listo". Usa `public/js/qrcode.min.js`.
-- Cuentas por cobrar (`db.pendientes`, en el iPad): "Por cobrar" guarda el ticket con un nombre o mesa para quien come en el local; "Por cobrar (n)" en Vender las muestra para abrir, agregar más y cobrar. No cuentan en el corte hasta cobrarlas, y el corte avisa si hay alguna.
+- Cuentas por cobrar (`db.pendientes`, en el iPad): una por cliente, acumulables. "Por cobrar" guarda el ticket con el nombre del cliente o la mesa; si ya hay una cuenta con ese nombre (sin importar mayúsculas), se suma a ella y se juntan las líneas iguales. "Por cobrar (n)" muestra cada cuenta con lo que pidió, el total y a dónde llevarlo (con "Ruta (QR)"). Con un ticket abierto, la lista ofrece "Sumar ticket actual" a cualquier cuenta. Sirve para quien come en el local y para quien llega en coche y pide que se lo lleven a su casa. No cuentan en el corte hasta cobrarlas, y el corte avisa si hay alguna.
 
 ## Pendiente
 

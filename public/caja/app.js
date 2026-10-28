@@ -423,8 +423,9 @@
       '<div class="card prices"><table><tr><th>Producto</th><th class="r">Precio</th><th class="r"></th></tr>' + rows + "</table>" +
       '<p class="note">Los cambios se guardan al salir de cada casilla. Si cambias un precio aquí, cámbialo también en el menú web.</p></div>' +
       "<h3>Pedidos del menú web</h3>" +
-      '<div class="card"><label class="field"><span>PIN de la caja (el mismo de CAJA_PIN en Netlify)</span><input id="pin-set" type="password" inputmode="numeric" value="' + esc(db.settings.pin || "") + '"></label>' +
+      '<div class="card"><p>' + (token() ? "Sesión de <b>" + esc(ses.usuario || "caja") + "</b>, vence el " + esc(fecha(new Date(sesExp()).toISOString())) + "." : "Sin sesión.") + "</p>" +
       '<p class="note">' + (ped.ok ? "Conectado." : ped.ok === false ? esc(ped.error) : "Sin conectar todavía.") + "</p>" +
+      '<div class="row2" style="margin-bottom:10px"><button type="button" class="btn ghost" data-act="logout">Cerrar sesión</button></div>' +
       '<button type="button" class="chk' + (db.settings.mute ? " on" : "") + '" data-act="mute">' + (db.settings.mute ? "Sonido de aviso apagado" : "Sonido de aviso encendido") + "</button></div>" +
       "<h3>Envío del corte</h3>" +
       '<div class="card"><label class="field"><span>WhatsApp que recibe el corte (con 52 al inicio)</span><input id="wa" type="tel" value="' + esc(db.settings.wa) + '"></label></div>' +
@@ -534,6 +535,9 @@
   document.addEventListener("click", function (e) {
     var t = e.target, el;
 
+    /* pantalla de entrada: tapa todo hasta que se entra */
+    if (!$("login").hidden) { if (find(t, '[data-act="login"]')) doLogin(); return; }
+
     /* ruta de entrega (va encima de cualquier otra ventana) */
     if (state.qr) {
       if (find(t, '[data-act="copy-ruta"]')) { toast(copyText(state.qr.url) ? "Enlace copiado" : "No se pudo copiar"); return; }
@@ -579,7 +583,8 @@
       return;
     }
     if ((el = find(t, "[data-ptab]"))) { ped.tab = attr(el, "data-ptab"); return render(); }
-    if (find(t, '[data-act="save-pin"]')) { db.settings.pin = ($("pin").value || "").trim(); save(); ped.first = true; ped.ok = null; render(); poll(); return; }
+    if (find(t, '[data-act="show-login"]')) return showLogin();
+    if (find(t, '[data-act="logout"]')) return logout();
     if (find(t, '[data-act="mute"]')) { db.settings.mute = !db.settings.mute; save(); if (!db.settings.mute) beep(); return render(); }
 
     /* ventana de opciones */
@@ -716,7 +721,6 @@
       save(); toast("Precio guardado");
     }
     if (t.id === "wa") { db.settings.wa = t.value.replace(/\D/g, ""); save(); toast("Número guardado"); }
-    if (t.id === "pin-set") { db.settings.pin = t.value.trim(); save(); ped.first = true; ped.ok = null; toast("PIN guardado"); poll(); }
   });
 
   /* =========================================================
@@ -726,7 +730,53 @@
   var API = "/api/pedidos";
   var ped = { list: [], known: {}, ok: null, error: "", tab: "activos", open: null, ask: null, busy: false, banner: null, first: true };
   var ESTADO_TXT = { nuevo: "Nuevo", aceptado: "Preparando", listo: "Listo", entregado: "Entregado", rechazado: "Rechazado" };
-  function pin() { return db.settings.pin || ""; }
+  /* =========================================================
+     ENTRADA A LA CAJA: usuario y contraseña (CAJA_USUARIO y CAJA_PASSWORD en Netlify).
+     El servidor da una sesión firmada que dura 30 días en este iPad; sin ella no se ven los pedidos.
+     ========================================================= */
+  var SES_KEY = "carbon-caja-sesion";
+  var ses = null, entrando = false;
+  try { ses = JSON.parse(window.localStorage.getItem(SES_KEY) || "null"); } catch (e) { ses = null; }
+  delete db.settings.pin;
+  function sesExp() { return ses && ses.token ? Number(String(ses.token).split(".")[0]) || 0 : 0; }
+  function token() { return sesExp() > Date.now() ? ses.token : ""; }
+  function setSes(s) {
+    ses = s;
+    try { if (s) window.localStorage.setItem(SES_KEY, JSON.stringify(s)); else window.localStorage.removeItem(SES_KEY); } catch (e) {}
+  }
+  function showLogin(msg) {
+    var el = $("login"), last = "";
+    try { last = window.localStorage.getItem(SES_KEY + "-usuario") || ""; } catch (e) {}
+    el.innerHTML = '<div class="l-box"><div class="l-brand">El Carboncito<small>Caja</small></div>' +
+      '<label class="field"><span>Usuario</span><input id="l-user" type="text" autocapitalize="off" autocorrect="off" autocomplete="username" value="' + esc(last) + '"></label>' +
+      '<label class="field"><span>Contraseña</span><input id="l-pass" type="password" autocomplete="current-password"></label>' +
+      '<p class="l-err" id="l-err"' + (msg ? "" : " hidden") + ">" + esc(msg || "") + "</p>" +
+      '<button type="button" class="btn" data-act="login">Entrar</button>' +
+      '<p class="note">La sesión dura 30 días en este iPad. Para entrar se necesita internet.</p></div>';
+    el.hidden = false;
+    var f = $(last ? "l-pass" : "l-user"); if (f) f.focus();
+  }
+  function doLogin() {
+    if (entrando) return;
+    var u = ($("l-user").value || "").trim(), pw = $("l-pass").value || "", er = $("l-err");
+    if (!u || !pw) { er.textContent = "Escribe usuario y contraseña."; er.hidden = false; return; }
+    entrando = true; er.textContent = "Entrando…"; er.hidden = false;
+    withTimeout(fetch("/api/caja/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ usuario: u, password: pw }), cache: "no-store" }), 12000)
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || !d.ok) throw new Error(d.error || ("Error " + r.status)); return d; }); })
+      .then(function (d) {
+        entrando = false;
+        setSes({ token: d.token, usuario: d.usuario });
+        try { window.localStorage.setItem(SES_KEY + "-usuario", u); } catch (e) {}
+        $("login").hidden = true; $("login").innerHTML = "";
+        ped.first = true; ped.ok = null; render(); poll();
+      })
+      .catch(function (e) {
+        entrando = false;
+        er.textContent = e.message === "tiempo" || /fetch|network|load/i.test(e.message) ? "Sin conexión. Revisa el internet y vuelve a probar." : e.message;
+        er.hidden = false; $("l-pass").value = "";
+      });
+  }
+  function logout() { setSes(null); ped.list = []; ped.known = {}; ped.ok = null; refreshPedidos(); showLogin(); }
   function activos() { return ped.list.filter(function (p) { return p.estado === "nuevo" || p.estado === "aceptado" || p.estado === "listo"; }); }
   function nuevos() { return ped.list.filter(function (p) { return p.estado === "nuevo"; }).length; }
   function findPed(key) { for (var i = 0; i < ped.list.length; i++) if (ped.list[i].key === key) return ped.list[i]; return null; }
@@ -736,10 +786,11 @@
   }
   function withTimeout(p, ms) { return Promise.race([p, new Promise(function (_, rej) { setTimeout(function () { rej(new Error("tiempo")); }, ms); })]); }
   function api(method, path, body) {
-    var opts = { method: method, headers: { "x-caja-pin": pin() }, cache: "no-store" };
+    var opts = { method: method, headers: { "authorization": "Bearer " + token() }, cache: "no-store" };
     if (body) { opts.headers["content-type"] = "application/json"; opts.body = JSON.stringify(body); }
     return withTimeout(fetch(API + path, opts), 12000).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (d) {
+        if (r.status === 401 && d.login) { setSes(null); showLogin(d.error); }
         if (!r.ok || !d.ok) throw new Error(d.error || ("Error " + r.status));
         return d;
       });
@@ -769,7 +820,7 @@
   document.addEventListener("click", unlockAudio, true);
 
   function poll() {
-    if (!pin() || ped.busy || document.hidden) return;
+    if (!token() || ped.busy || document.hidden) return;
     ped.busy = true;
     api("GET", "").then(function (d) {
       ped.busy = false; ped.ok = true; ped.error = "";
@@ -837,9 +888,9 @@
     return '<div class="row2">' + b.join("") + '</div><a class="wa-cli" href="' + esc(wa) + '" target="_blank" rel="noopener">Escribirle por WhatsApp</a>';
   }
   function ordersHTML() {
-    if (!pin()) {
-      return '<div class="page"><div class="page-in"><h2>Pedidos del menú</h2><div class="card"><p>Para recibir los pedidos del menú web, escribe el PIN de la caja. Es el mismo que se configuró en Netlify como CAJA_PIN.</p>' +
-        '<label class="field"><span>PIN de la caja</span><input id="pin" type="password" inputmode="numeric" autocomplete="off"></label><button type="button" class="btn" data-act="save-pin">Conectar</button></div></div></div>';
+    if (!token()) {
+      return '<div class="page"><div class="page-in"><h2>Pedidos del menú</h2><div class="card"><p>Entra con el usuario y la contraseña de la caja para ver los pedidos.</p>' +
+        '<button type="button" class="btn" data-act="show-login">Entrar</button></div></div></div>';
     }
     var list = ped.tab === "activos" ? activos().slice().reverse() : ped.list.filter(function (p) { return p.estado === "entregado" || p.estado === "rechazado"; }).reverse();
     var status = ped.ok === false ? '<p class="conn bad">' + esc(ped.error) + "</p>" : ped.ok ? '<p class="conn">Conectado · se actualiza solo</p>' : '<p class="conn">Conectando…</p>';
@@ -895,9 +946,13 @@
     state.pay = { metodo: p.cliente.pago === "transferencia" ? "transferencia" : "efectivo", recv: p.cliente.pagaCon ? String(p.cliente.pagaCon) : "", done: null };
     renderLayer();
   }
+  document.addEventListener("keydown", function (e) {
+    if ((e.keyCode === 13 || e.key === "Enter") && (e.target.id === "l-pass" || e.target.id === "l-user")) { e.preventDefault(); doLogin(); }
+  });
   poll();
 
   render();
+  if (!token()) showLogin(ses && ses.token ? "La sesión venció. Vuelve a entrar." : "");
 
   /* funciona sin internet una vez abierta */
   if ("serviceWorker" in navigator && location.protocol === "https:") {

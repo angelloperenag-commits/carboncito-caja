@@ -135,18 +135,65 @@ export async function cambiarEstado(store, key, estado, extra = {}, now = new Da
 
 /* Un pedido por minuto desde la misma conexión. Se guarda un resumen (hash) de la IP, no la IP. */
 export const ESPERA_MS = 60e3;
-async function claveIP(ip) {
-  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("carboncito:" + ip));
-  return "limite/" + [...new Uint8Array(h)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
+const enc = new TextEncoder();
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+async function claveIP(ip, prefix = "limite/") {
+  return prefix + hex(await crypto.subtle.digest("SHA-256", enc.encode("carboncito:" + ip))).slice(0, 24);
+}
+async function hmac(key, msg) {
+  const k = await crypto.subtle.importKey("raw", enc.encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return hex(await crypto.subtle.sign("HMAC", k, enc.encode(msg)));
+}
+/* compara sin revelar por el tiempo cuántos caracteres coinciden */
+async function iguales(a, b) { return (await hmac("comparar", String(a))) === (await hmac("comparar", String(b))); }
+
+/* Sesión de la caja: "vence.firma". La firma usa usuario y contraseña, así que cambiar la contraseña cierra todas las sesiones. */
+export const SESION_DIAS = 30;
+const firma = (cfg, exp) => hmac("carboncito-sesion:" + cfg.usuario + ":" + cfg.password, String(exp));
+export async function crearSesion(cfg, now = Date.now()) { const exp = now + SESION_DIAS * 864e5; return exp + "." + (await firma(cfg, exp)); }
+async function sesionValida(cfg, tok) {
+  const m = /^(\d{13})\.([0-9a-f]{64})$/.exec(tok || "");
+  if (!cfg.password || !m || Number(m[1]) < Date.now()) return false;
+  return iguales(m[2], await firma(cfg, Number(m[1])));
 }
 
-/* Maneja la petición HTTP; lo usan Netlify y el servidor local */
-export async function handle(req, store, pin, ip = "") {
+/* Intentos de entrada: 5 errores seguidos desde la misma conexión bloquean 15 minutos */
+export const MAX_INTENTOS = 5, BLOQUEO_MS = 15 * 60e3;
+async function bloqueado(store, k) {
+  const r = k ? await store.get(k, { type: "json" }) : null;
+  return r && r.n >= MAX_INTENTOS && Date.now() - r.t < BLOQUEO_MS ? Math.ceil((BLOQUEO_MS - (Date.now() - r.t)) / 60e3) : 0;
+}
+async function fallo(store, k) {
+  if (!k) return;
+  const r = (await store.get(k, { type: "json" })) || { n: 0 };
+  const n = Date.now() - (r.t || 0) > BLOQUEO_MS ? 1 : r.n + 1;
+  await store.setJSON(k, { n, t: Date.now() });
+}
+
+/* Avisos para n8n: al aceptar, terminar o rechazar un pedido web se deja un aviso en la cola.
+   n8n los recoge (GET /api/avisos), manda el WhatsApp y los borra (POST /api/avisos/ok). */
+const AVISO = { aceptado: "recibido", listo: "listo", rechazado: "rechazado" };
+export async function encolarAviso(store, p, now = new Date()) {
+  const tipo = AVISO[p.estado];
+  const tel = String(p.cliente.telefono || "").replace(/\D/g, "").slice(-10);
+  if (!tipo || tel.length !== 10) return null;
+  const a = {
+    key: `aviso/${p.key.split("/")[2]}-${tipo}`, tipo, pedido: p.key, folio: p.folio, t: now.toISOString(),
+    nombre: p.cliente.nombre, telefono: "52" + tel, total: p.total, entrega: p.cliente.entrega, entregaLabel: p.cliente.entregaLabel, pago: p.cliente.pago,
+  };
+  await store.setJSON(a.key, a);
+  return a;
+}
+
+/* Maneja la petición HTTP; lo usan Netlify y el servidor local.
+   cfg: { usuario, password (de la caja), avisos (llave de n8n) } */
+export async function handle(req, store, cfg, ip = "") {
   const url = new URL(req.url);
   const json = (data, status = 200) => new Response(JSON.stringify(data), {
     status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
-  const okPin = () => pin && req.headers.get("x-caja-pin") === pin;
+  cfg = Object.assign({ usuario: "caja", password: "", avisos: "" }, cfg);
+  const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   try {
     if (req.method === "POST" && url.pathname === "/api/pedidos") {
       const len = Number(req.headers.get("content-length") || 0);
@@ -167,14 +214,44 @@ export async function handle(req, store, pin, ip = "") {
       if (lim) await store.setJSON(lim, { t: Date.now() });
       return json({ ok: true, folio: p.folio, total: p.total });
     }
-    if (!pin) return json({ error: "Falta configurar CAJA_PIN en Netlify." }, 500);
-    if (!okPin()) return json({ error: "PIN incorrecto." }, 401);
+    /* n8n: cola de avisos de WhatsApp */
+    if (url.pathname === "/api/avisos" || url.pathname === "/api/avisos/ok") {
+      if (cfg.avisos.length < 20) return json({ error: "Falta configurar AVISOS_TOKEN (20 caracteres o más) en Netlify." }, 500);
+      if (!(await iguales(req.headers.get("x-avisos-token") || "", cfg.avisos))) return json({ error: "Llave incorrecta." }, 401);
+      if (req.method === "GET") {
+        const { blobs } = await store.list({ prefix: "aviso/" });
+        const avisos = [];
+        for (const b of blobs.slice(0, 20)) { const a = await store.get(b.key, { type: "json" }); if (a) avisos.push(a); }
+        return json({ ok: true, avisos });
+      }
+      if (req.method === "POST") {
+        const b = await req.json().catch(() => ({}));
+        const keys = (Array.isArray(b.keys) ? b.keys : [b.key]).filter((k) => typeof k === "string" && k.startsWith("aviso/")).slice(0, 50);
+        for (const k of keys) await store.delete(k);
+        return json({ ok: true, borrados: keys.length });
+      }
+    }
+    if (!cfg.password) return json({ error: "Falta configurar CAJA_PASSWORD en Netlify." }, 500);
+    const intentos = ip ? await claveIP(ip, "intentos/") : "";
+    if (req.method === "POST" && url.pathname === "/api/caja/login") {
+      const espera = await bloqueado(store, intentos);
+      if (espera) return json({ error: `Demasiados intentos. Espera ${espera} min y vuelve a probar.` }, 429);
+      const b = await req.json().catch(() => ({}));
+      const okUsuario = await iguales(str(b.usuario, 60).toLowerCase(), cfg.usuario.toLowerCase());
+      const okPassword = await iguales(String(b.password || ""), cfg.password);
+      if (!okUsuario || !okPassword) { await fallo(store, intentos); return json({ error: "Usuario o contraseña incorrectos." }, 401); }
+      if (intentos) await store.delete(intentos);
+      return json({ ok: true, token: await crearSesion(cfg), usuario: cfg.usuario, dias: SESION_DIAS });
+    }
+    if (!(await sesionValida(cfg, bearer))) return json({ error: "La sesión de la caja venció. Vuelve a entrar.", login: true }, 401);
     if (req.method === "GET" && url.pathname === "/api/pedidos") {
       return json({ ok: true, ahora: new Date().toISOString(), pedidos: await listarPedidos(store, url.searchParams.get("desde")) });
     }
     if (req.method === "POST" && url.pathname === "/api/pedidos/estado") {
       const b = await req.json().catch(() => ({}));
-      return json({ ok: true, pedido: await cambiarEstado(store, b.key, b.estado, b) });
+      const p = await cambiarEstado(store, b.key, b.estado, b);
+      if (cfg.avisos) await encolarAviso(store, p);
+      return json({ ok: true, pedido: p });
     }
     return json({ error: "No encontrado." }, 404);
   } catch (e) {

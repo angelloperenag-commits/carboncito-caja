@@ -328,6 +328,12 @@ pre.summary { white-space: pre-wrap; font-family: Menlo, monospace; font-size: 1
 .cm-foot .btn { font-size: 20px; padding: 18px 12px; }
 .wa-cli { display: block; text-align: center; margin-top: 10px; color: #146c3a; font-weight: 700; }
 @media (max-width: 760px) { .cm-body { display: block; } .cm-items { padding-right: 0; } .cm-side { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; } }
+.login { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 60; background: var(--panel); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.l-box { width: 100%; max-width: 380px; background: var(--card); border-radius: 20px; padding: 24px 22px; box-shadow: 0 20px 50px rgba(0, 0, 0, .35); }
+.l-brand { font-family: Georgia, serif; font-weight: bold; font-size: 28px; color: var(--terra); text-align: center; margin-bottom: 18px; }
+.l-brand small { display: block; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-soft); }
+.l-err { color: var(--err); font-weight: 600; margin: 0 0 10px; }
+.login .btn { width: 100%; margin-bottom: 10px; }
 .toast { position: fixed; left: 50%; bottom: 30px; -webkit-transform: translateX(-50%); transform: translateX(-50%); z-index: 40; background: var(--panel); color: var(--cream); padding: 12px 18px; border-radius: 12px; font-weight: 600; box-shadow: 0 8px 20px rgba(0, 0, 0, .25); }
 </style>
 </head>
@@ -349,6 +355,7 @@ pre.summary { white-space: pre-wrap; font-family: Menlo, monospace; font-size: 1
   <main class="view" id="view"></main>
 </div>
 <div id="layer"></div>
+<div id="login" class="login" hidden></div>
 <script src="../js/qrcode.min.js"></script>
 <script src="app.js"></script>
 <script>

@@ -1,5 +1,5 @@
 /* Guarda la caja en el iPad para que abra sin internet. Cambia VERSION al publicar cambios. */
-var VERSION = "caja-v9";
+var VERSION = "caja-v10";
 var FILES = ["./", "index.html", "app.js", "../js/qrcode.min.js", "manifest.webmanifest", "icon-180.png", "icon-512.png",
   "img/sencilla.png", "img/hawaiana.png", "img/bbq.png", "img/loba.png", "img/monstruo.png",
   "img/hotdog.png", "img/hotdog-tocino.png", "img/salchipulpos.png", "img/papas.png", "img/alitas.png"];

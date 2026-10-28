@@ -5,9 +5,9 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 ## Qué hay en el repositorio
 
 - `public/index.html`: menú web para clientes (celulares modernos). Constructor visual por capas con fotos WebP en `public/img/`, carrito y envío del pedido a `/api/pedidos`. Si el envío falla, ofrece WhatsApp (527771138935).
-- `public/caja/`: punto de venta para el iPad Air 1 con iOS 12.5.8 (no se puede actualizar). Vender, cobrar con cambio, ventas del turno, corte de caja, ajustes de precios, y pestaña Pedidos que recibe los pedidos del menú (consulta cada 10 s con el PIN).
+- `public/caja/`: punto de venta para el iPad Air 1 con iOS 12.5.8 (no se puede actualizar). Vender, cobrar con cambio, ventas del turno, corte de caja, ajustes de precios, y pestaña Pedidos que recibe los pedidos del menú (consulta cada 10 s con la sesión de la caja). Se entra con usuario y contraseña.
 - `netlify/functions/pedidos.mjs` + `shared/core.mjs`: API de pedidos sobre Netlify Blobs. El servidor recalcula precios con el catálogo de `shared/core.mjs`; el precio que manda el cliente no se usa.
-- `dev/server.mjs`: servidor local con la misma API y almacén en memoria (`CAJA_PIN=2468 node dev/server.mjs`).
+- `dev/server.mjs`: servidor local con la misma API y almacén en memoria (`CAJA_PASSWORD=prueba1234 AVISOS_TOKEN=... node dev/server.mjs`; usuario `caja`).
 
 ## Reglas que no se rompen
 
@@ -15,7 +15,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Al cambiar la caja, subir `VERSION` en `public/caja/sw.js` para que el iPad tome la versión nueva.
 - **Precios en tres lugares:** `shared/core.mjs` (manda), el menú `public/index.html` (objeto `MENU`) y la caja `public/caja/app.js` (`PRODUCTS`). Si cambian, cambiarlos en los tres.
 - Los ids de producto, de opción y los nombres de ingredientes "sin" deben coincidir entre menú, servidor y caja: así la caja puede pasar un pedido web al ticket.
-- Las ventas de la caja viven solo en el iPad (localStorage). Los pedidos web viven en Netlify Blobs. Los datos de clientes solo salen con el PIN (`CAJA_PIN`, variable de entorno en Netlify).
+- Las ventas de la caja viven solo en el iPad (localStorage). Los pedidos web viven en Netlify Blobs. Los datos de clientes solo salen con la sesión de la caja (`CAJA_USUARIO` y `CAJA_PASSWORD`) o, para n8n, con `AVISOS_TOKEN` (variables de entorno en Netlify). `CAJA_PIN` ya no se usa.
 - Netlify plan gratis: cada deploy gasta unos 15 de 300 créditos al mes. Juntar cambios antes de subir a `main`.
 - **Solo código del propio sitio.** `netlify.toml` manda una CSP para todo el sitio (`script-src 'self' 'unsafe-inline'`, `connect-src 'self'`). No cargar scripts de CDNs: las librerías van en `public/js/` (qrcode-generator 1.4.4 y jsPDF 4.2.1, verificadas con el SRI de cdnjs). Google Fonts sí está permitido (solo CSS y fuentes).
 - Dependencias con versión fija en `package.json` (nada de `latest`).
@@ -26,7 +26,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - **`main`** es lo que ven los clientes (`https://elcarboncito.netlify.app`). Solo se pasa a `main` lo que ya se probó en `pruebas`, con un pull request de `pruebas` → `main`, y juntando cambios (cada deploy de producción gasta unos 15 créditos).
 - Los pedidos de pruebas viven en el almacén `pedidos-pruebas`. `netlify/functions/pedidos.mjs` lo elige con el contexto del deploy, así que nunca se mezclan con los pedidos reales (`pedidos`).
 - En pruebas, el menú y la caja muestran una franja roja "SITIO/CAJA DE PRUEBAS". Se activa en cualquier dirección con `--` (branch deploys y vistas previas) y en `localhost`.
-- `CAJA_PIN` puede tener otro valor en pruebas: en Netlify, *Environment variables → CAJA_PIN → Different value for each deploy context*.
+- `CAJA_USUARIO`, `CAJA_PASSWORD` y `AVISOS_TOKEN` pueden tener otro valor en pruebas: en Netlify, *Environment variables → la variable → Different value for each deploy context*. Cambiar `CAJA_PASSWORD` cierra todas las sesiones de la caja (necesita redeploy).
 
 ## Pagos, ticket y datos del cliente
 
@@ -54,5 +54,16 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 - Probar la caja en el iPad real: el sitio de pruebas es privado y el inicio de sesión de Netlify no carga en iOS 12, así que el iPad solo puede abrir la caja de producción.
 - Revisar `public/caja/app.js` con acorn (ES2017) y esbuild (`safari12`): la caja v7 (domicilio, cuentas por cobrar) se escribió en ES5 a mano, pero no se pudo correr Node en la computadora donde se hizo. Se probó en Chromium a tamaño de iPad, no en el iPad real.
-- Limitar intentos de PIN en `/api/pedidos` (hoy no hay límite y un PIN corto se puede adivinar). Mientras tanto, usar un `CAJA_PIN` de al menos 8 dígitos.
 - frakOs (sistema propio para equipos viejos) es investigación a largo plazo, fuera de este repositorio.
+
+## Entrada a la caja
+
+- La caja pide usuario y contraseña al abrir (`/api/caja/login`, contra `CAJA_USUARIO` —por defecto `caja`— y `CAJA_PASSWORD`). El servidor da una sesión firmada (`vence.firma`, HMAC con usuario y contraseña) que dura 30 días; la caja la guarda en `localStorage` (`carbon-caja-sesion`, fuera del respaldo) y la manda como `Authorization: Bearer`. Sin internet sigue vendiendo con la sesión guardada.
+- 5 intentos fallidos desde la misma conexión bloquean 15 minutos (`intentos/…` con hash de la IP).
+
+## Avisos por WhatsApp (n8n)
+
+- n8n, Evolution API (WhatsApp vinculado como dispositivo, no la API oficial), PostgreSQL y Redis corren en Docker en la PC de la casa: `G:\Documentos\ChatGPT\RLoperena 2\carboncito-whatsapp` (proyecto `carboncito-whatsapp`, n8n en `http://localhost:5678`). Sus claves están en ese `.env` y en `bootstrap/` (no se suben a ningún lado).
+- Netlify no puede llamar a la PC, así que n8n pregunta: al aceptar, marcar listo o rechazar un pedido web, el servidor deja un aviso en `aviso/…`; el flujo `Carboncito · Avisos de pedidos` (`n8n/carboncito-pedidos.json`) lee `GET /api/avisos` con la cabecera `x-avisos-token`, manda el texto por Evolution y borra el aviso con `POST /api/avisos/ok`. Corre cada 30 s de viernes a domingo, 5 pm a 1 am. Si falla se reintenta; pasada 1 hora se descarta.
+- El sitio de pruebas es privado (Netlify pide iniciar sesión), así que n8n solo puede leer producción.
+- La PC debe estar encendida y con internet para que salgan los mensajes; si no, los pedidos siguen llegando a la caja igual.

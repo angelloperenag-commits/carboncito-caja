@@ -19,7 +19,7 @@ export const CATALOG = {
   hawaiana: { name: "Hawaiana", ...burger(["carne", "queso", "jamon", "pina"], 70) },
   bbq: { name: "BBQ", ...burger(["carne", "queso", "jamon", "tocino"], 70) },
   loba: { name: "Loba", ...burger(["carne", "queso", "jamon", "salchicha"], 80) },
-  monstruo: { name: "Monstruo", ...burger(["carne", "carne", "queso", "jamon", "salchicha", "tocino", "pina"], 100) },
+  monstruo: { name: "Monstruo", ...burger(["carne", "carne", "queso", "jamon", "salchicha", "tocino", "pina"], 90) },
   hotdog: { name: "Hotdog sencillo", recipe: ["hd_salchicha", "hd_jitomate", "hd_cebolla", "hd_catsup", "hd_mostaza"], fixed: ["hd_salchicha"], opts: [["1 hotdog", 20], ["3 hotdogs", 40]] },
   "hotdog-tocino": { name: "Hotdog con tocino", recipe: ["hd_salchicha_tocino", "hd_jitomate", "hd_cebolla", "hd_catsup", "hd_mostaza"], fixed: ["hd_salchicha_tocino"], opts: [["1 hotdog", 25], ["3 hotdogs", 50]] },
   salchipulpos: { name: "Salchipulpos", recipe: ["sp_papas", "salchipulpo", "sp_queso", "sp_catsup", "sp_valentina"], fixed: ["sp_papas", "salchipulpo"], opts: [["Chico (4 pulpos)", 40], ["Grande (6 pulpos)", 60]] },

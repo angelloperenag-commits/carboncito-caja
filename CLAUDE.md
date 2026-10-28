@@ -38,7 +38,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 ## Menú: datos del negocio
 
 - Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. 777 113 8935.
-- Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $100. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
+- Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $90. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
 - Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50.
 - Alitas, orden de 10 a $110 o media orden de 5 a $60, por defecto "Receta secreta sin salsa"; salsas: piña habanero, mango habanero, tamarindo picante, BBQ picante, BBQ dulce; se permite mitad y mitad. Llevan zanahoria, pepino, jícama en cama de lechuga y ranch (se pueden quitar).
 - Combo mixto de alitas (`alitas-mixto`): 10 alitas, 2 de cada una de las 5 salsas, $110; medio combo, 1 de cada salsa, $60. No se eligen salsas.

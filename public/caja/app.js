@@ -24,7 +24,7 @@
     { id: "hawaiana", cat: "burgers", name: "Hawaiana", opts: [["Con papas", 70], ["Sin papas", 60]], quitar: ["Queso amarillo", "Jamón", "Piña asada"].concat(VEG) },
     { id: "bbq", cat: "burgers", name: "BBQ", opts: [["Con papas", 70], ["Sin papas", 60]], quitar: ["Queso amarillo", "Jamón", "Tocino"].concat(VEG) },
     { id: "loba", cat: "burgers", name: "Loba", opts: [["Con papas", 80], ["Sin papas", 70]], quitar: ["Queso amarillo", "Jamón", "Salchicha"].concat(VEG) },
-    { id: "monstruo", cat: "burgers", name: "Monstruo", opts: [["Con papas", 100], ["Sin papas", 90]], quitar: ["Queso amarillo", "Jamón", "Salchicha", "Tocino", "Piña asada"].concat(VEG) },
+    { id: "monstruo", cat: "burgers", name: "Monstruo", opts: [["Con papas", 90], ["Sin papas", 80]], quitar: ["Queso amarillo", "Jamón", "Salchicha", "Tocino", "Piña asada"].concat(VEG) },
     { id: "hotdog", cat: "snacks", name: "Hotdog sencillo", opts: [["1 hotdog", 20], ["3 hotdogs", 40]], quitar: HD },
     { id: "hotdog-tocino", cat: "snacks", name: "Hotdog con tocino", opts: [["1 hotdog", 25], ["3 hotdogs", 50]], quitar: HD },
     { id: "salchipulpos", cat: "snacks", name: "Salchipulpos", opts: [["Chico (4 pulpos)", 40], ["Grande (6 pulpos)", 60]], quitar: ["Queso de nachos", "Catsup", "Valentina"] },

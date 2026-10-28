@@ -93,6 +93,9 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .tile b { display: block; font-size: 16px; text-transform: uppercase; letter-spacing: .02em; }
 .tile span { display: block; color: var(--terra); font-weight: 700; font-size: 16px; margin-top: 2px; }
 .tile.out { opacity: .45; }
+.tile.draft { opacity: .7; border-style: dashed; }
+.tile.draft::after { content: "Borrador"; position: absolute; top: 8px; left: 8px; background: var(--ink-soft); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+.tile small { display: block; color: var(--ink-soft); font-size: 12px; line-height: 1.25; margin: 2px 0; }
 .tile.out::after { content: "Agotado"; position: absolute; top: 8px; left: 8px; background: var(--err); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
 
 .ticket {
@@ -237,6 +240,11 @@ pre.summary { white-space: pre-wrap; font-family: Menlo, monospace; font-size: 1
 .chips { display: flex; flex-wrap: wrap; margin: 0 -3px; }
 .chip { border: 1.5px solid transparent; background: var(--tint); border-radius: 999px; padding: 10px 14px; margin: 3px; font-size: 15px; }
 .chip.on { border-color: var(--orange); background: var(--sel); }
+.part { border-top: 1px dashed var(--line); margin-top: 8px; }
+.part h4 .pend { color: var(--err); }
+.part .chips + .chips { margin-top: 4px; }
+.comps { margin: 4px 0 0 18px; }
+.comps p { margin: 2px 0; }
 .chip.off { border-color: var(--err); background: #fbe9e6; color: var(--err); text-decoration: line-through; }
 .m-foot { flex: none; display: flex; align-items: center; padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .m-foot .step { margin-right: 10px; }

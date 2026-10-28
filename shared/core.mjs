@@ -1,18 +1,32 @@
 /* Lógica de pedidos compartida por la función de Netlify y el servidor de pruebas.
    El servidor recalcula todo con este catálogo: el precio que manda el teléfono del cliente no se usa. */
 
+/* Ingredientes. Lo que no está en "fixed" se puede pedir "sin" (no hay extras con costo). */
 const N = {
   carne: "Carne", queso: "Queso amarillo", jamon: "Jamón", salchicha: "Salchicha", tocino: "Tocino", pina: "Piña asada",
   lechuga: "Lechuga", jitomate: "Jitomate", cebolla: "Cebolla", chile: "Chile en vinagre", catsup: "Catsup", mostaza: "Mostaza",
-  hd_salchicha: "Salchicha", hd_salchicha_tocino: "Salchicha con tocino", hd_jitomate: "Jitomate", hd_cebolla: "Cebolla", hd_catsup: "Catsup", hd_mostaza: "Mostaza",
+  hd_salchicha: "Salchicha", hd_salchicha_tocino: "Salchicha con tocino", hd_jitomate: "Jitomate", hd_cebolla: "Cebolla", hd_catsup: "Catsup", hd_mostaza: "Mostaza", hd_chile: "Chiles",
   sp_papas: "Papas", salchipulpo: "Salchipulpos", sp_queso: "Queso de nachos", sp_catsup: "Catsup", sp_valentina: "Valentina",
-  alitas: "Alitas", alitas_lechuga: "Cama de lechuga", zanahoria: "Zanahoria", pepino: "Pepino", jicama: "Jícama", ranch: "Ranch",
+  alitas: "Alitas", ranch: "Ranch",
 };
 const VEG = ["lechuga", "jitomate", "cebolla", "chile", "catsup", "mostaza"];
-const WINGS = ["alitas", "alitas_lechuga", "zanahoria", "pepino", "jicama", "ranch"];
+const HD = ["hd_jitomate", "hd_cebolla", "hd_catsup", "hd_mostaza", "hd_chile"];
+/* las verduras de las alitas no siempre van, así que no se anuncian ni se pueden quitar: solo el ranch */
+const WINGS = ["alitas", "ranch"];
 const burger = (meats, price) => ({ recipe: [...meats, ...VEG], fixed: ["carne"], opts: [["Con papas", price], ["Sin papas", price - 10]] });
-/* bebida: sin ingredientes que quitar; una opción por tamaño. Ej.: bebida("Refresco", [["600 ml", 25]]) */
-const bebida = (name, opts) => ({ name, recipe: [], fixed: [], opts, drink: true });
+/* bebida: sin ingredientes que quitar; una opción por presentación, con su precio.
+   Ej.: "refresco": bebida("Refresco", [["600 ml", 25]]). disponible: false la saca de la venta. */
+const bebida = (name, opts, extra) => Object.assign({ name, recipe: [], fixed: [], opts, drink: true, disponible: true }, extra);
+/* combo: precio fijo y partes. Cada parte toma de su producto (pid) las salsas y lo que se puede quitar.
+   unSabor: la parte lleva exactamente un sabor. pend: algo por confirmar. repetidos: null = falta confirmar.
+   Queda en borrador (no se vende) mientras falte el precio, haya un pend o falte decidir repetidos. */
+const part = (pid, label, extra) => Object.assign({ pid, label }, extra);
+const combo = (name, price, parts, extra) => {
+  const c = Object.assign({ name, recipe: [], fixed: [], opts: [["Combo", price]], parts }, extra);
+  c.draft = price == null || parts.some((x) => x.pend) || (parts.some((x) => x.unSabor) && typeof c.repetidos !== "boolean");
+  return c;
+};
+const PAPAS_PEND = "Falta confirmar si lleva sus papas", ALITAS_PEND = "Falta confirmar si es orden completa y cuántas piezas";
 
 export const CATALOG = {
   sencilla: { name: "Sencilla", ...burger(["carne", "queso"], 60) },
@@ -20,14 +34,33 @@ export const CATALOG = {
   bbq: { name: "BBQ", ...burger(["carne", "queso", "jamon", "tocino"], 70) },
   loba: { name: "Loba", ...burger(["carne", "queso", "jamon", "salchicha"], 80) },
   monstruo: { name: "Monstruo", ...burger(["carne", "carne", "queso", "jamon", "salchicha", "tocino", "pina"], 90) },
-  hotdog: { name: "Hotdog sencillo", recipe: ["hd_salchicha", "hd_jitomate", "hd_cebolla", "hd_catsup", "hd_mostaza"], fixed: ["hd_salchicha"], opts: [["1 hotdog", 20], ["3 hotdogs", 40]] },
-  "hotdog-tocino": { name: "Hotdog con tocino", recipe: ["hd_salchicha_tocino", "hd_jitomate", "hd_cebolla", "hd_catsup", "hd_mostaza"], fixed: ["hd_salchicha_tocino"], opts: [["1 hotdog", 25], ["3 hotdogs", 50]] },
+  hotdog: { name: "Hotdog sencillo", recipe: ["hd_salchicha", ...HD], fixed: ["hd_salchicha"], opts: [["1 hotdog", 20], ["3 hotdogs", 40]] },
+  "hotdog-tocino": { name: "Hotdog con tocino", recipe: ["hd_salchicha_tocino", ...HD], fixed: ["hd_salchicha_tocino"], opts: [["1 hotdog", 25], ["3 hotdogs", 50]] },
   salchipulpos: { name: "Salchipulpos", recipe: ["sp_papas", "salchipulpo", "sp_queso", "sp_catsup", "sp_valentina"], fixed: ["sp_papas", "salchipulpo"], opts: [["Chico (4 pulpos)", 40], ["Grande (6 pulpos)", 60]] },
-  papas: { name: "Orden de papas", recipe: ["sp_papas"], fixed: ["sp_papas"], opts: [["Chica", 30], ["Grande", 50]] },
+  papas: { name: "Orden de papas", recipe: ["sp_papas", "sp_queso", "sp_catsup", "sp_valentina"], fixed: ["sp_papas"], opts: [["Chica", 30], ["Grande", 50]] },
   alitas: { name: "Alitas", recipe: WINGS, fixed: ["alitas"], opts: [["Orden de 10", 110], ["Media orden (5)", 60]], sauces: true },
   "alitas-mixto": { name: "Combo mixto de alitas", recipe: WINGS, fixed: ["alitas"], opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]] },
+  /* combos (mismos ids y partes en el menú y en la caja) */
+  "combo-carboncito": combo("CARBONCITO", 100, [
+    part("sencilla", "Hamburguesa sencilla"), part("papas", "Papas", { pend: "Falta confirmar la porción" }),
+    part("alitas", "4 alitas"), part(null, "Refresco de 600 ml", { pend: "Falta confirmar marca y sabor" }),
+  ]),
+  "combo-rico": combo("Combo rico", 200, [
+    part("hawaiana", "Hamburguesa hawaiana", { pend: PAPAS_PEND }), part("alitas", "Alitas", { pend: ALITAS_PEND }),
+    part("salchipulpos", "Salchipulpos chicos (4 pulpos)"), part("hotdog", "Orden de hot dog", { pend: "Falta confirmar cuántos hot dogs y de cuáles" }),
+  ]),
+  "combo-domi": combo("Domi combo", 300, [
+    part("hawaiana", "Hamburguesa hawaiana 1", { pend: PAPAS_PEND }), part("hawaiana", "Hamburguesa hawaiana 2", { pend: PAPAS_PEND }),
+    part("alitas", "Alitas", { pend: ALITAS_PEND }), part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
+    part("hotdog", "Orden de hot dogs sencillos", { pend: "Falta confirmar cuántos hot dogs" }),
+  ]),
+  "medio-alicombo": combo("1/2 Alicombo", null, [
+    part("alitas", "Media orden 1", { unSabor: true }), part("alitas", "Media orden 2", { unSabor: true }), part("alitas", "Media orden 3", { unSabor: true }),
+  ], { repetidos: null }),
   /* bebidas: agregarlas aquí, en el menú (MENU.drinks) y en la caja (PRODUCTS, cat "drinks") con el mismo id */
 };
+/* se puede vender: no es borrador, está disponible y todas sus opciones tienen precio */
+export const sellable = (p) => !!p && !p.draft && p.disponible !== false && p.opts.every((o) => typeof o[1] === "number");
 export const SAUCES = {
   "receta-secreta": "Receta secreta sin salsa", "pina-habanero": "Piña habanero", "mango-habanero": "Mango habanero",
   "tamarindo-picante": "Tamarindo picante", "bbq-picante": "BBQ picante", "bbq-dulce": "BBQ dulce",
@@ -40,6 +73,32 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const str = (v, max) => String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
 
+/* salsas de unas alitas: hasta dos (mitad y mitad); si no eligió, la receta secreta */
+function salsas(list) {
+  const s = [...new Set((Array.isArray(list) ? list : []).filter((x) => SAUCES[x]))].slice(0, 2);
+  return s.length ? s : ["receta-secreta"];
+}
+/* lo elegido en cada parte de un combo, revisado contra el producto de esa parte */
+function componentes(p, combo) {
+  const elegido = Array.isArray(combo) ? combo : [];
+  if (elegido.length !== p.parts.length) throw new Error(`Falta personalizar tu ${p.name}.`);
+  const out = p.parts.map((c, i) => {
+    const r = c.pid ? CATALOG[c.pid] : null, e = elegido[i] || {};
+    const off = r ? [...new Set((Array.isArray(e.off) ? e.off : []).filter((x) => r.recipe.includes(x) && !r.fixed.includes(x)))] : [];
+    let s = [];
+    if (r && r.sauces) {
+      if (c.unSabor) {
+        s = (Array.isArray(e.sauces) ? e.sauces : []).filter((x) => SAUCES[x]).slice(0, 1);
+        if (!s.length) throw new Error(`Elige el sabor de: ${c.label}.`);
+      } else s = salsas(e.sauces);
+    }
+    return { label: c.label, sauces: s.map((x) => SAUCES[x]), sin: off.map((x) => N[x]), unSabor: !!c.unSabor };
+  });
+  const unos = out.filter((x) => x.unSabor).map((x) => x.sauces[0]);
+  if (p.repetidos === false && new Set(unos).size !== unos.length) throw new Error(`En el ${p.name} los sabores no se repiten.`);
+  return out.map(({ label, sauces, sin }) => ({ label, sauces, sin }));
+}
+
 /* Revisa el pedido que llega del menú y lo deja listo para la caja. Lanza Error con un mensaje para el cliente. */
 export function normalizeOrder(body) {
   if (!body || typeof body !== "object") throw new Error("El pedido llegó vacío.");
@@ -48,15 +107,12 @@ export function normalizeOrder(body) {
   const lines = items.map((it) => {
     const p = CATALOG[it && it.id];
     if (!p) throw new Error("Hay un producto que ya no está en el menú.");
+    if (!sellable(p)) throw new Error(`${p.name} todavía no está a la venta.`);
     const opt = Number(it.opt) || 0;
     if (!p.opts[opt]) throw new Error("Hay una opción que ya no existe.");
     const qty = Math.max(1, Math.min(30, Math.floor(Number(it.qty) || 1)));
     const off = [...new Set((Array.isArray(it.off) ? it.off : []).filter((x) => p.recipe.includes(x) && !p.fixed.includes(x)))];
-    let sauces = [];
-    if (p.sauces) {
-      sauces = [...new Set((Array.isArray(it.sauces) ? it.sauces : []).filter((s) => SAUCES[s]))].slice(0, 2);
-      if (!sauces.length) sauces = ["receta-secreta"];
-    }
+    const sauces = p.sauces ? salsas(it.sauces) : [];
     const counts = {};
     p.recipe.forEach((x) => { if (!off.includes(x)) counts[x] = (counts[x] || 0) + 1; });
     return {
@@ -64,6 +120,7 @@ export function normalizeOrder(body) {
       sauces: sauces.map((s) => SAUCES[s]),
       sin: off.map((x) => N[x]),
       lleva: Object.keys(counts).map((x) => N[x] + (counts[x] > 1 ? " ×" + counts[x] : "")),
+      componentes: p.parts ? componentes(p, it.combo) : [],
     };
   });
   const c = body.cliente || {};

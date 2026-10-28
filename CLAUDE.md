@@ -39,10 +39,17 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 - Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. 777 113 8935.
 - Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $90. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
-- Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50.
-- Alitas, orden de 10 a $110 o media orden de 5 a $60, por defecto "Receta secreta sin salsa"; salsas: piña habanero, mango habanero, tamarindo picante, BBQ picante, BBQ dulce; se permite mitad y mitad. Llevan zanahoria, pepino, jícama en cama de lechuga y ranch (se pueden quitar).
+- Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Llevan jitomate, cebolla, catsup, mostaza y chiles (todo se puede quitar). Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50, con queso de nachos, catsup y Valentina (se pueden quitar).
+- Alitas, orden de 10 a $110 o media orden de 5 a $60, por defecto "Receta secreta sin salsa"; salsas: piña habanero, mango habanero, tamarindo picante, BBQ picante, BBQ dulce; se permite mitad y mitad. Llevan ranch (se puede quitar). Las verduras no siempre van: no se anuncian ni aparecen para quitar.
 - Combo mixto de alitas (`alitas-mixto`): 10 alitas, 2 de cada una de las 5 salsas, $110; medio combo, 1 de cada salsa, $60. No se eligen salsas.
-- Bebidas: el sistema está listo pero todavía no hay ninguna. Para agregar una: `bebida(...)` en `CATALOG` de `shared/core.mjs`, `MENU.drinks` en el menú (`builder: "drink"`, foto WebP opcional en `file`) y `PRODUCTS` con `cat: "drinks"` en la caja, con el mismo id. La sección y la pestaña aparecen solas.
+- Lo que se puede quitar son exclusiones ("sin"), nunca extras. Un ingrediente sin foto (como los chiles del hotdog, `noLayer`) se puede quitar pero no se dibuja.
+- Combos (categoría Combos): precio fijo y partes (`parts`). Cada parte toma de su producto (`pid`) las salsas y lo que se puede quitar; `unSabor` pide exactamente un sabor; `pend` marca algo por confirmar. Un combo queda en **borrador** (no aparece en el menú, la caja lo muestra como "Borrador" sin dejar venderlo y el servidor lo rechaza) mientras le falte el precio, tenga un `pend` o falte `repetidos` (si las partes de un solo sabor pueden repetir). Hoy los 4 son borrador:
+  - CARBONCITO $100: hamburguesa sencilla, papas (falta la porción), 4 alitas, refresco de 600 ml incluido en el precio (falta marca y sabor).
+  - Combo rico $200: hamburguesa hawaiana (¿lleva sus papas?), alitas (¿orden completa?, ¿cuántas piezas?), salchipulpos chicos, orden de hot dog (¿cuántos y de cuáles?).
+  - Domi combo $300: 2 hamburguesas hawaianas (¿con papas?), alitas (igual que arriba), salchipulpos grandes, orden de hot dogs sencillos (¿cuántos?).
+  - 1/2 Alicombo: 3 medias órdenes, un sabor cada una (falta precio y si se repiten sabores).
+  Al confirmar, quitar el `pend` o poner el precio/`repetidos` en los tres catálogos (servidor, menú y caja). El pedido lleva `combo: [{ sauces, off }]` por parte y el servidor regresa `componentes: [{ label, sauces, sin }]`.
+- Bebidas: el sistema está listo pero todavía no hay ninguna (no se venden sueltas hasta tener catálogo y precios). Para agregar una: `bebida(nombre, [[presentación, precio], ...])` en `CATALOG` de `shared/core.mjs`; en el menú `MENU.drinks` con `desc`, `prices`, `file` (foto WebP en `img/`; sin foto se ve un marcador) y `disponible`; en la caja `PRODUCTS` con `cat: "drinks"`, `desc`, `img` (PNG en `caja/img/`, iOS 12 no lee WebP) y `disponible`. Mismo id en los tres. La sección del menú solo aparece si hay alguna disponible con precio; en la caja también se puede marcar Agotado en Ajustes.
 
 ## Caja: domicilio y cuentas por cobrar
 

@@ -9,7 +9,10 @@ const N = {
   alitas: "Alitas", alitas_lechuga: "Cama de lechuga", zanahoria: "Zanahoria", pepino: "Pepino", jicama: "Jícama", ranch: "Ranch",
 };
 const VEG = ["lechuga", "jitomate", "cebolla", "chile", "catsup", "mostaza"];
+const WINGS = ["alitas", "alitas_lechuga", "zanahoria", "pepino", "jicama", "ranch"];
 const burger = (meats, price) => ({ recipe: [...meats, ...VEG], fixed: ["carne"], opts: [["Con papas", price], ["Sin papas", price - 10]] });
+/* bebida: sin ingredientes que quitar; una opción por tamaño. Ej.: bebida("Refresco", [["600 ml", 25]]) */
+const bebida = (name, opts) => ({ name, recipe: [], fixed: [], opts, drink: true });
 
 export const CATALOG = {
   sencilla: { name: "Sencilla", ...burger(["carne", "queso"], 60) },
@@ -21,7 +24,9 @@ export const CATALOG = {
   "hotdog-tocino": { name: "Hotdog con tocino", recipe: ["hd_salchicha_tocino", "hd_jitomate", "hd_cebolla", "hd_catsup", "hd_mostaza"], fixed: ["hd_salchicha_tocino"], opts: [["1 hotdog", 25], ["3 hotdogs", 50]] },
   salchipulpos: { name: "Salchipulpos", recipe: ["sp_papas", "salchipulpo", "sp_queso", "sp_catsup", "sp_valentina"], fixed: ["sp_papas", "salchipulpo"], opts: [["Chico (4 pulpos)", 40], ["Grande (6 pulpos)", 60]] },
   papas: { name: "Orden de papas", recipe: ["sp_papas"], fixed: ["sp_papas"], opts: [["Chica", 30], ["Grande", 50]] },
-  alitas: { name: "Alitas", recipe: ["alitas", "alitas_lechuga", "zanahoria", "pepino", "jicama", "ranch"], fixed: ["alitas"], opts: [["Orden de 10", 110]], sauces: true },
+  alitas: { name: "Alitas", recipe: WINGS, fixed: ["alitas"], opts: [["Orden de 10", 110], ["Media orden (5)", 60]], sauces: true },
+  "alitas-mixto": { name: "Combo mixto de alitas", recipe: WINGS, fixed: ["alitas"], opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]] },
+  /* bebidas: agregarlas aquí, en el menú (MENU.drinks) y en la caja (PRODUCTS, cat "drinks") con el mismo id */
 };
 export const SAUCES = {
   "receta-secreta": "Receta secreta sin salsa", "pina-habanero": "Piña habanero", "mango-habanero": "Mango habanero",

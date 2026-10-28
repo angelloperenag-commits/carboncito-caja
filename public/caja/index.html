@@ -121,6 +121,16 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   width: 100%; margin-top: 8px; font-size: 16px; padding: 10px 12px; border-radius: 10px;
   border: 1px solid var(--line); background: #fffdf8; color: var(--ink);
 }
+.dir { display: flex; margin-top: 8px; }
+.t-meta .dir input { flex: 1 1 auto; width: auto; min-width: 0; margin-top: 0; }
+.dir button { flex: none; margin-left: 6px; border: 0; border-radius: 10px; padding: 0 12px; background: var(--panel); color: var(--cream); font-weight: 600; font-size: 14px; }
+.cats button.pend { flex: 0 0 auto; padding-left: 14px; padding-right: 14px; background: #fff4d6; border-color: var(--orange); color: var(--orange-dk); }
+.t-foot .btn { padding-left: 8px; padding-right: 8px; }
+.t-foot .row2 .btn.ghost { padding-left: 11px; padding-right: 11px; font-size: 15px; }
+.qr-t { font-weight: 700; font-size: 18px; margin: 12px 0 4px; }
+.qr-dir { font-size: 17px; margin: 0 0 6px; }
+.qr { text-align: center; margin: 10px 0 4px; }
+.qr svg { width: 280px; height: 280px; max-width: 100%; }
 .t-foot { flex: none; padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
 .total { display: flex; align-items: baseline; margin-bottom: 10px; }
 .total span { margin-right: auto; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; font-size: 14px; color: var(--ink-soft); }
@@ -332,6 +342,7 @@ pre.summary { white-space: pre-wrap; font-family: Menlo, monospace; font-size: 1
   <main class="view" id="view"></main>
 </div>
 <div id="layer"></div>
+<script src="../js/qrcode.min.js"></script>
 <script src="app.js"></script>
 <script>
 /* Aviso en la caja de pruebas: ahí llegan solo los pedidos del menú de pruebas. ES5 para iOS 12. */

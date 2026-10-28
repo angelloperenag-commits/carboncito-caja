@@ -178,7 +178,7 @@ body { position: relative; }
 /* ---------- navegación ---------- */
 .tabs {
   position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 5 !important;
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
   padding: 5px; background: var(--panel);
   border-radius: 999px; box-shadow: 0 6px 16px rgba(60, 30, 10, .25);
 }
@@ -629,6 +629,7 @@ button.prow:focus-visible, button.chip:focus-visible, .stepper button:focus-visi
     <a href="#hamburguesas" data-sec="hamburguesas">Burgers</a>
     <a href="#hotdogs" data-sec="hotdogs">Hotdogs</a>
     <a href="#alitas" data-sec="alitas">Alitas</a>
+    <a href="#bebidas" data-sec="bebidas" hidden>Bebidas</a>
   </nav>
 
   <section id="hamburguesas">
@@ -645,6 +646,11 @@ button.prow:focus-visible, button.chip:focus-visible, .stepper button:focus-visi
   <section id="alitas">
     <h2 class="sec-title">Alitas &amp; salsas</h2>
     <div class="items" data-cat="wings"></div>
+  </section>
+
+  <section id="bebidas" hidden>
+    <h2 class="sec-title">Bebidas</h2>
+    <div class="items" data-cat="drinks"></div>
   </section>
 
   <div class="pay">
@@ -730,6 +736,9 @@ const ING = {
   sp_queso:  { name: "Queso de nachos", file: "sp-queso-nachos.webp", sy: .55, at: { x: 50, y: 26, w: 44 }, ar: .58, tone: "#f4a91c", wipe: true },
   sp_catsup: { name: "Catsup", file: "sp-catsup.webp", sy: .55, at: { x: 44, y: 29, w: 40 }, ar: .44, tone: "#b81d12", wipe: true },
   sp_valentina: { name: "Valentina", file: "sp-valentina.webp", sy: .5, at: { x: 57, y: 28, w: 40 }, ar: .6, tone: "#8a1a0a", wipe: true },
+
+  /* bebidas: la foto la pone cada producto (file); sin foto se ve el marcador con su nombre */
+  bebida: { name: "Bebida", ar: 1.6, tone: "#2f6db5", ghost: true },
 };
 Object.values(ING).forEach(g => { if (g.price == null) g.price = 0; if (g.available == null) g.available = true; });
 
@@ -783,11 +792,18 @@ const MENU = {
       prices: [["Chica", 30], ["Grande", 50]] },
   ],
   wings: [
-    { id: "alitas", name: "Alitas", icon: "i-wings", builder: "wings", desc: "10 piezas con verduras y ranch", sauces: true,
-      lead: "Orden de 10 piezas, con zanahoria, pepino y jícama en cama de lechuga, y su ranch.",
+    { id: "alitas", name: "Alitas", icon: "i-wings", builder: "wings", desc: "10 o 5 piezas con verduras y ranch", sauces: true,
+      lead: "Orden de 10 piezas o media orden de 5, con zanahoria, pepino y jícama en cama de lechuga, y su ranch.",
       recipe: ["alitas", "alitas_lechuga", "zanahoria", "pepino", "jicama", "ranch"], fixed: ["alitas"],
-      prices: [["Orden de 10 piezas", 110]] },
+      prices: [["Orden de 10 piezas", 110], ["Media orden · 5 piezas", 60]] },
+    { id: "alitas-mixto", name: "Combo mixto", icon: "i-wings", builder: "wings", desc: "Prueba todas las salsas: 2 alitas de cada sabor", mix: true,
+      lead: "Piña habanero, mango habanero, tamarindo picante, BBQ picante y BBQ dulce. Con zanahoria, pepino y jícama en cama de lechuga, y su ranch.",
+      recipe: ["alitas", "alitas_lechuga", "zanahoria", "pepino", "jicama", "ranch"], fixed: ["alitas"],
+      prices: [["10 alitas · 2 de cada sabor", 110], ["Medio combo · 1 de cada sabor", 60]] },
   ],
+  /* bebidas: { id, name, desc, lead, file (foto WebP opcional en img/), prices: [["600 ml", 25]] }
+     con builder "drink", recipe [] y fixed []. Mismo id en shared/core.mjs y en la caja. La sección aparece sola cuando hay alguna. */
+  drinks: [],
 };
 const ARTIFACT_URL = location.origin + "/";
 const WA = "527771138935";
@@ -809,6 +825,8 @@ document.querySelectorAll(".items").forEach(box => {
       <span class="go"><span class="from">${!p.combo && p.prices.length > 1 ? "<small>desde</small>" : ""}${money(listPrice(p))}</span><span class="plus" aria-hidden="true">+</span></span>
     </button>`).join("");
 });
+/* la sección de bebidas aparece cuando hay alguna */
+if (MENU.drinks.length) document.querySelectorAll("#bebidas, [data-sec=bebidas]").forEach(el => { el.hidden = false; });
 
 /* ---------- fotos ---------- */
 const IMG = {};
@@ -831,6 +849,7 @@ function filesOf(p) {
   if (p.builder === "hotdog") f.push(ING.hd_pan_atras.file);
   if (p.builder === "wings") f.push("canasta.webp", "canasta-frente.webp", "canasta-lechuga-frente.webp", ...SAUCES.map(s => s.file));
   if (p.builder === "loaded") f.push("canasta.webp", "canasta-frente.webp", "salchipulpos-6.webp");
+  if (p.builder === "drink") f.push(p.file);
   return uniq(f.filter(Boolean));
 }
 let rq = 0;
@@ -885,7 +904,7 @@ const COMPOSE = {
     basket(L, !isOff(s, "alitas_lechuga"));
     const put = (id, z) => { if (isOff(s, id)) return; const g = ING[id], a = g.at; L.push({ key: id, ing: id, x: a.x, y: a.y, w: a.w, sy: g.sy, z, enter: "drop", order: z - 28 }); };
     put("zanahoria", 30); put("pepino", 31); put("jicama", 32); put("ranch", 33);
-    const sa = s.sauces.map(sauceById);
+    const sa = (p.mix ? ["mango-habanero", "tamarindo-picante"] : s.sauces).map(sauceById);
     if (!sa.length) L.push({ key: "pila0", ing: "alitas_ghost", file: null, label: "Elige tu salsa", x: 50, y: 14, w: 66, z: 40, enter: "drop", order: 6 });
     else [[33, 14, 0], [67, 13, 1]].forEach(([x, y, i]) => {
       const sc = sa[i] || sa[0];
@@ -910,6 +929,11 @@ const COMPOSE = {
       });
     }
     return { H, L, fit: 1, shadow: { x: 50, w: 94 } };
+  },
+
+  /* bebida: su foto si la hay; si no, un marcador con el nombre */
+  drink(p) {
+    return { H: 70, L: [{ key: "bebida", ing: "bebida", file: p.file || null, label: p.name, x: 50, y: 4, w: 40, z: 1, enter: "pop", order: 0 }], fit: 1, shadow: { x: 50, w: 46 } };
   },
 };
 

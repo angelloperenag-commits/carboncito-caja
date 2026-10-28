@@ -6,13 +6,18 @@
   /* =========================================================
      PRODUCTOS (mismos precios que el menú web)
      opts: [nombre, precio]; quitar: lo que se puede pedir "sin"
+     img: foto en img/ (sin .png); si falta se usa el id; "" = sin foto
+     Bebidas: { id, cat: "drinks", name, opts: [["600 ml", 25]], quitar: [], img: "" }
+     con el mismo id que en shared/core.mjs y en el menú. La pestaña aparece sola.
      ========================================================= */
   var VEG = ["Lechuga", "Jitomate", "Cebolla", "Chile en vinagre", "Catsup", "Mostaza"];
   var HD = ["Jitomate", "Cebolla", "Catsup", "Mostaza"];
+  var WINGS = ["Cama de lechuga", "Zanahoria", "Pepino", "Jícama", "Ranch"];
   var CATS = [
     { id: "burgers", name: "Hamburguesas" },
     { id: "snacks", name: "Hotdogs y botanas" },
-    { id: "wings", name: "Alitas" }
+    { id: "wings", name: "Alitas" },
+    { id: "drinks", name: "Bebidas" }
   ];
   var PRODUCTS = [
     { id: "sencilla", cat: "burgers", name: "Sencilla", opts: [["Con papas", 60], ["Sin papas", 50]], quitar: ["Queso amarillo"].concat(VEG) },
@@ -24,8 +29,11 @@
     { id: "hotdog-tocino", cat: "snacks", name: "Hotdog con tocino", opts: [["1 hotdog", 25], ["3 hotdogs", 50]], quitar: HD },
     { id: "salchipulpos", cat: "snacks", name: "Salchipulpos", opts: [["Chico (4 pulpos)", 40], ["Grande (6 pulpos)", 60]], quitar: ["Queso de nachos", "Catsup", "Valentina"] },
     { id: "papas", cat: "snacks", name: "Orden de papas", opts: [["Chica", 30], ["Grande", 50]], quitar: [] },
-    { id: "alitas", cat: "wings", name: "Alitas", opts: [["Orden de 10", 110]], sauces: true, quitar: ["Cama de lechuga", "Zanahoria", "Pepino", "Jícama", "Ranch"] }
+    { id: "alitas", cat: "wings", name: "Alitas", opts: [["Orden de 10", 110], ["Media orden (5)", 60]], sauces: true, quitar: WINGS },
+    { id: "alitas-mixto", cat: "wings", name: "Combo mixto de alitas", img: "alitas", opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]], quitar: WINGS }
   ];
+  CATS = CATS.filter(function (c) { return PRODUCTS.some(function (p) { return p.cat === c.id; }); });
+  function imgOf(p) { var f = p.img == null ? p.id : p.img; return f ? '<img src="img/' + f + '.png" alt="">' : ""; }
   var SAUCES = ["Receta secreta sin salsa", "Piña habanero", "Mango habanero", "Tamarindo picante", "BBQ picante", "BBQ dulce"];
   var METODOS = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" };
   var TIPOS = { aqui: "Aquí", llevar: "Para llevar", domicilio: "Domicilio" };
@@ -39,6 +47,7 @@
     return {
       shift: newShift(0),
       history: [],
+      pendientes: [],
       settings: { prices: {}, soldOut: {}, wa: "527771138935", business: "El Carboncito" }
     };
   }
@@ -53,6 +62,7 @@
   if (!db.settings) db.settings = blank().settings;
   if (!db.shift) db.shift = newShift(0);
   if (!db.history) db.history = [];
+  if (!db.pendientes) db.pendientes = [];
   function save() {
     if (!canSave) return;
     try { window.localStorage.setItem(KEY, JSON.stringify(db)); }
@@ -107,10 +117,76 @@
      ========================================================= */
   var state = {
     view: "sell", cat: "burgers", showTicket: false,
-    cart: [], tipo: "aqui", nota: "",
+    cart: [], tipo: "aqui", nota: "", dir: "", fromPend: null,
     openSale: null, confirm: null,
-    pick: null, pay: null
+    pick: null, pay: null, pend: false, pendAsk: null, qr: null
   };
+
+  /* =========================================================
+     DOMICILIO: enlace de Google Maps y código QR de la ruta
+     (WhatsApp no corre en el iPad con iOS 12: el repartidor escanea el QR con su celular)
+     ========================================================= */
+  function mapsLink(dir) { var m = String(dir || "").match(/https?:\/\/\S+/i); return m ? m[0] : ""; }
+  function lugar(dir) {
+    var q = String(dir || "").trim();
+    if (q && !/temixco|cuernavaca|jiutepec|xochitepec|zapata|morelos/i.test(q)) q += ", Temixco, Morelos";
+    return q || "Temixco, Morelos";
+  }
+  function buscarURL(dir) { return mapsLink(dir) || "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(lugar(dir)); }
+  function rutaURL(dir) { return mapsLink(dir) || "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(lugar(dir)); }
+  function openRuta(title, dir, extra) { state.qr = { title: title, dir: dir, extra: extra || "", url: rutaURL(dir) }; renderLayer(); }
+  function qrSVG(text) {
+    if (typeof window.qrcode !== "function") return "";
+    try { var q = window.qrcode(0, "M"); q.addData(text); q.make(); return q.createSvgTag(6, 4); } catch (e) { return ""; }
+  }
+  function qrHTML() {
+    var r = state.qr, svg = qrSVG(r.url);
+    return '<div class="overlay qr-ov"><div class="modal">' +
+      '<div class="m-head"><h2>Ruta de entrega</h2><button type="button" class="x" data-act="close-qr" aria-label="Cerrar">×</button></div>' +
+      '<div class="m-body"><p class="qr-t">' + esc(r.title) + "</p>" +
+      (r.dir ? '<p class="qr-dir">' + esc(r.dir) + "</p>" : "") + (r.extra ? '<p class="note">' + esc(r.extra) + "</p>" : "") +
+      (svg ? '<div class="qr">' + svg + '</div><p class="note" style="text-align:center">Escanéalo con la cámara del celular de quien reparte: abre la ruta en Google Maps.</p>'
+        : '<p class="note">No se pudo dibujar el código. Copia el enlace y mándalo por WhatsApp desde el celular.</p>') + "</div>" +
+      '<div class="m-foot"><div class="row2" style="width:100%"><a class="btn ghost" href="' + esc(r.url) + '" target="_blank" rel="noopener">Abrir mapa</a>' +
+      '<button type="button" class="btn dark" data-act="copy-ruta">Copiar enlace</button><button type="button" class="btn" data-act="close-qr">Listo</button></div></div></div></div>';
+  }
+
+  /* =========================================================
+     CUENTAS POR COBRAR (comen en el local y pagan al irse)
+     ========================================================= */
+  function pendTotal(p) { var t = 0; p.cart.forEach(function (l) { t += l.price * l.qty; }); return t; }
+  function findPend(id) { for (var i = 0; i < db.pendientes.length; i++) if (String(db.pendientes[i].id) === String(id)) return db.pendientes[i]; return null; }
+  function resetTicket() { state.cart = []; state.nota = ""; state.tipo = "aqui"; state.dir = ""; state.fromPend = null; state.fromPedido = null; state.showTicket = false; }
+  function holdTicket() {
+    if (!state.cart.length) return;
+    var nm = state.nota.trim();
+    if (!nm) { toast("Escribe el nombre o la mesa para guardar la cuenta"); var ni = $("nota"); if (ni) ni.focus(); return; }
+    var prev = state.fromPend ? findPend(state.fromPend) : null;
+    var rec = { id: prev ? prev.id : Date.now(), t: prev ? prev.t : new Date().toISOString(), nota: nm, tipo: state.tipo, dir: state.tipo === "domicilio" ? state.dir.trim() : "",
+      cart: JSON.parse(JSON.stringify(state.cart)) };
+    if (prev) db.pendientes[db.pendientes.indexOf(prev)] = rec; else db.pendientes.push(rec);
+    save(); resetTicket(); toast("Cuenta de " + nm + " guardada por cobrar"); render();
+  }
+  function loadPend(id) {
+    var p = findPend(id); if (!p) return;
+    if (state.cart.length && String(state.fromPend) !== String(p.id)) { toast("Primero cobra, guarda o vacía el ticket que está abierto"); return; }
+    state.cart = JSON.parse(JSON.stringify(p.cart)); state.nota = p.nota; state.tipo = p.tipo; state.dir = p.dir || "";
+    state.fromPend = p.id; state.fromPedido = null; state.showTicket = true; state.view = "sell";
+    closeLayer(); render();
+  }
+  function pendHTML() {
+    var list = db.pendientes.slice().reverse().map(function (p) {
+      var items = p.cart.map(function (l) { return l.qty + " " + prod(l.pid).name; }).join(", ");
+      var ask = state.pendAsk === String(p.id);
+      return '<div class="sale"><div class="h"><b>' + esc(p.nota) + "</b><span>" + hora(p.t) + " · " + TIPOS[p.tipo] + "</span><strong>" + money(pendTotal(p)) + "</strong></div><small>" + esc(items) + "</small>" +
+        (ask ? '<div class="confirm"><p>¿Borrar la cuenta de ' + esc(p.nota) + "? No se cobra ni cuenta en el corte.</p>" +
+          '<div class="row2"><button type="button" class="btn ghost" data-pendno="1">No</button><button type="button" class="btn red" data-penddel="' + p.id + '">Sí, borrar</button></div></div>'
+          : '<div class="row2" style="margin-top:8px"><button type="button" class="btn ghost" data-pendask="' + p.id + '">Borrar</button><button type="button" class="btn" data-pendload="' + p.id + '">Abrir para cobrar o agregar</button></div>') + "</div>";
+    }).join("");
+    return '<div class="overlay"><div class="modal">' +
+      '<div class="m-head"><h2>Cuentas por cobrar</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
+      '<div class="m-body" style="padding-top:12px">' + (list || '<p class="empty">No hay cuentas pendientes.</p>') + "</div></div></div>";
+  }
 
   /* reloj */
   function tick() {
@@ -156,11 +232,11 @@
   function sellHTML() {
     var tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat; }).map(function (p) {
       var out = db.settings.soldOut[p.id];
-      return '<button type="button" class="tile' + (out ? " out" : "") + '" data-add="' + p.id + '">' +
-        '<img src="img/' + p.id + '.png" alt="">' +
+      return '<button type="button" class="tile' + (out ? " out" : "") + '" data-add="' + p.id + '">' + imgOf(p) +
         "<b>" + esc(p.name) + "</b><span>" + (p.cat === "burgers" ? money(price(p, 0)) : (p.opts.length > 1 ? "desde " : "") + money(minPrice(p))) + "</span></button>";
     }).join("");
-    var cats = CATS.map(function (c) { return '<button type="button" data-cat="' + c.id + '" class="' + (c.id === state.cat ? "on" : "") + '">' + esc(c.name) + "</button>"; }).join("");
+    var cats = CATS.map(function (c) { return '<button type="button" data-cat="' + c.id + '" class="' + (c.id === state.cat ? "on" : "") + '">' + esc(c.name) + "</button>"; }).join("") +
+      (db.pendientes.length ? '<button type="button" class="pend" data-act="show-pend">Por cobrar (' + db.pendientes.length + ")</button>" : "");
     var n = cartCount(), t = cartTotal();
     return '<div class="sell' + (state.showTicket ? " show-ticket" : "") + '">' +
       '<div class="catalog"><div class="cats">' + cats + '</div><div class="grid">' + tiles + "</div>" +
@@ -174,12 +250,16 @@
         '<div class="step"><button type="button" data-line="' + i + '" data-d="-1">−</button><output>' + l.qty + '</output><button type="button" data-line="' + i + '" data-d="1">+</button></div></div>';
     }).join("") : '<p class="empty">Toca un producto para agregarlo.</p>';
     var tipos = Object.keys(TIPOS).map(function (k) { return '<button type="button" data-tipo="' + k + '" class="' + (state.tipo === k ? "on" : "") + '">' + TIPOS[k] + "</button>"; }).join("");
-    var t = cartTotal();
-    return '<div class="t-head"><button type="button" class="back-cat" data-act="hide-ticket">‹ Productos</button><h2>Ticket</h2><span class="folio">Venta #' + db.shift.next + "</span></div>" +
+    var t = cartTotal(), dis = state.cart.length ? "" : " disabled";
+    var dir = state.tipo === "domicilio" ? '<div class="dir"><input id="dir" type="text" placeholder="Dirección o enlace de Google Maps" value="' + esc(state.dir) + '" autocomplete="off">' +
+      '<button type="button" data-act="maps">Buscar en Maps</button></div>' : "";
+    return '<div class="t-head"><button type="button" class="back-cat" data-act="hide-ticket">‹ Productos</button><h2>Ticket</h2><span class="folio">' +
+      (state.fromPend ? "Cuenta por cobrar" : "Venta #" + db.shift.next) + "</span></div>" +
       '<div class="lines">' + lines + "</div>" +
-      '<div class="t-meta"><div class="seg">' + tipos + '</div><input id="nota" type="text" placeholder="Nombre o nota (opcional)" value="' + esc(state.nota) + '" autocomplete="off"></div>' +
+      '<div class="t-meta"><div class="seg">' + tipos + "</div>" + dir + '<input id="nota" type="text" placeholder="Nombre, mesa o nota" value="' + esc(state.nota) + '" autocomplete="off"></div>' +
       '<div class="t-foot"><div class="total"><span>Total</span><b>' + money(t) + "</b></div>" +
-      '<div class="row2"><button type="button" class="btn ghost" data-act="clear"' + (state.cart.length ? "" : " disabled") + '>Vaciar</button><button type="button" class="btn" data-act="pay"' + (state.cart.length ? "" : " disabled") + ">Cobrar " + money(t) + "</button></div></div>";
+      '<div class="row2"><button type="button" class="btn ghost" data-act="clear"' + dis + '>Vaciar</button><button type="button" class="btn ghost" data-act="hold"' + dis + '>Por cobrar</button>' +
+      '<button type="button" class="btn" data-act="pay"' + dis + ">Cobrar " + money(t) + "</button></div></div>";
   }
 
   function liveSales() { return db.shift.sales.filter(function (s) { return !s.cancelada; }); }
@@ -194,6 +274,8 @@
         }).join("") +
           "<p><b>Pago:</b> " + METODOS[s.metodo] + (s.metodo === "efectivo" && s.recibido ? " · recibió " + money(s.recibido) + " · cambio " + money(s.cambio) : "") + "</p>" +
           "<p><b>Entrega:</b> " + TIPOS[s.tipo] + (s.nota ? " · " + esc(s.nota) : "") + "</p>" +
+          (s.tipo === "domicilio" ? "<p><b>Dirección:</b> " + (s.dir ? esc(s.dir) : "sin dirección") + "</p>" +
+            '<div class="row2" style="margin-top:6px"><button type="button" class="btn dark" data-ruta="' + s.folio + '">Ruta de entrega (QR)</button></div>' : "") +
           (s.cancelada ? "" : (state.confirm === "cancel-" + s.folio
             ? '<div class="confirm"><p>¿Cancelar la venta #' + s.folio + " por " + money(s.total) + '? No cuenta en el corte.</p><div class="row2"><button type="button" class="btn ghost" data-act="no">No</button><button type="button" class="btn red" data-cancel="' + s.folio + '">Sí, cancelar venta</button></div></div>'
             : '<div class="row2" style="margin-top:10px"><button type="button" class="btn ghost" data-ask="cancel-' + s.folio + '">Cancelar venta</button></div>')) + "</div>";
@@ -271,6 +353,9 @@
       "</div>" +
       "<h3>Productos vendidos</h3>" +
       '<div class="card">' + (rows ? '<table><tr><th>Producto</th><th class="r">Cant.</th><th class="r">Importe</th></tr>' + rows + "</table>" : '<p class="note">Todavía no hay ventas.</p>') + "</div>" +
+      (db.pendientes.length ? '<div class="confirm"><p>Hay ' + db.pendientes.length + " cuenta" + (db.pendientes.length > 1 ? "s" : "") + " por cobrar (" +
+        money(db.pendientes.reduce(function (a, p) { return a + pendTotal(p); }, 0)) + "). No cuentan en el corte hasta cobrarlas.</p>" +
+        '<div class="row2"><button type="button" class="btn dark" data-act="show-pend">Ver cuentas por cobrar</button></div></div>' : "") +
       "<h3>Enviar y cerrar</h3>" +
       '<div class="row2"><a class="btn green" href="' + esc(wa) + '" target="_blank" rel="noopener">Enviar por WhatsApp</a><button type="button" class="btn dark" data-act="copy-sum">Copiar resumen</button></div>' +
       (state.confirm === "close"
@@ -303,7 +388,7 @@
       '<div class="row2"><button type="button" class="btn dark" data-act="copy-backup">Copiar respaldo</button><button type="button" class="btn ghost" data-act="show-import">Restaurar respaldo</button></div>' +
       (state.confirm === "import" ? '<label class="field" style="margin-top:10px"><span>Pega aquí el respaldo</span><textarea id="imp"></textarea></label><div class="row2"><button type="button" class="btn ghost" data-act="no">Cancelar</button><button type="button" class="btn red" data-act="do-import">Reemplazar datos con este respaldo</button></div>' : "") +
       "</div>" +
-      '<p class="note" style="text-align:center;margin-top:20px">Caja El Carboncito · versión 2</p>' +
+      '<p class="note" style="text-align:center;margin-top:20px">Caja El Carboncito · versión 3</p>' +
       "</div></div>";
   }
 
@@ -327,7 +412,7 @@
     }).join("") + "</div>" : "";
     var total = price(p, s.opt) * s.qty;
     return '<div class="overlay"><div class="modal">' +
-      '<div class="m-head"><img src="img/' + p.id + '.png" alt=""><h2>' + esc(p.name) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
+      '<div class="m-head">' + imgOf(p) + "<h2>" + esc(p.name) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
       '<div class="m-body">' + opts + sauces + quitar + "</div>" +
       '<div class="m-foot"><div class="step"><button type="button" data-pq="-1">−</button><output>' + s.qty + '</output><button type="button" data-pq="1">+</button></div>' +
       '<button type="button" class="btn" data-act="add-line">Agregar · ' + money(total) + "</button></div></div></div>";
@@ -343,7 +428,9 @@
       return '<div class="overlay"><div class="modal"><div class="done">' +
         '<div class="big">Venta #' + s.done.folio + " registrada</div>" +
         (s.done.metodo === "efectivo" && s.done.recibido ? "<p class='note'>Cambio</p><div class='chg'>" + money(s.done.cambio) + "</div>" : "<div class='chg'>" + money(s.done.total) + "</div><p class='note'>" + METODOS[s.done.metodo] + "</p>") +
-        '</div><div class="m-foot"><button type="button" class="btn" data-act="new-sale">Nueva venta</button></div></div></div>';
+        '</div><div class="m-foot"><div class="row2" style="width:100%">' +
+        (s.done.tipo === "domicilio" ? '<button type="button" class="btn dark" data-act="ruta-done">Ruta de entrega (QR)</button>' : "") +
+        '<button type="button" class="btn" data-act="new-sale">Nueva venta</button></div></div></div></div>';
     }
     var recv = Number(s.recv) || 0, falta = recv && recv < t, cambio = recv - t;
     var metodos = Object.keys(METODOS).map(function (k) { return '<button type="button" data-metodo="' + k + '" class="' + (s.metodo === k ? "on" : "") + '">' + METODOS[k] + "</button>"; }).join("");
@@ -369,26 +456,29 @@
     var sale = {
       folio: db.shift.next, t: new Date().toISOString(), total: t, metodo: s.metodo,
       recibido: s.metodo === "efectivo" && recv ? recv : 0, cambio: s.metodo === "efectivo" && recv ? recv - t : 0,
-      tipo: state.tipo, nota: state.nota.trim(), cancelada: false,
+      tipo: state.tipo, nota: state.nota.trim(), dir: state.tipo === "domicilio" ? state.dir.trim() : "", cancelada: false,
       lines: state.cart.map(function (l) {
         var p = prod(l.pid);
         return { pid: l.pid, name: p.name, opt: p.opts.length > 1 ? p.opts[l.opt][0] : "", desc: lineDesc(l), qty: l.qty, price: l.price };
       })
     };
     if (state.fromPedido) { var wp = findPed(state.fromPedido); if (wp) sale.web = wp.folio; setEstado(state.fromPedido, "entregado", { ventaFolio: sale.folio }); state.fromPedido = null; }
+    if (state.fromPend) { var pp = findPend(state.fromPend); if (pp) db.pendientes.splice(db.pendientes.indexOf(pp), 1); }
     db.shift.sales.push(sale); db.shift.next++; save();
     s.done = sale;
-    state.cart = []; state.nota = ""; state.tipo = "aqui"; state.showTicket = false;
+    resetTicket();
   }
 
   function renderLayer() {
     var L = $("layer");
-    if (state.pick) L.innerHTML = pickHTML();
+    if (state.qr) L.innerHTML = qrHTML();
+    else if (state.pick) L.innerHTML = pickHTML();
     else if (state.pay) L.innerHTML = payHTML();
+    else if (state.pend) L.innerHTML = pendHTML();
     else if (ped.open && findPed(ped.open)) L.innerHTML = comandaHTML(findPed(ped.open));
     else L.innerHTML = "";
   }
-  function closeLayer() { state.pick = null; state.pay = null; ped.open = null; ped.ask = null; renderLayer(); }
+  function closeLayer() { state.pick = null; state.pay = null; state.pend = false; state.pendAsk = null; state.qr = null; ped.open = null; ped.ask = null; renderLayer(); }
 
   /* =========================================================
      EVENTOS
@@ -399,15 +489,45 @@
   document.addEventListener("click", function (e) {
     var t = e.target, el;
 
+    /* ruta de entrega (va encima de cualquier otra ventana) */
+    if (state.qr) {
+      if (find(t, '[data-act="copy-ruta"]')) { toast(copyText(state.qr.url) ? "Enlace copiado" : "No se pudo copiar"); return; }
+      if (find(t, '[data-act="close-qr"]') || t.className === "overlay qr-ov") { state.qr = null; return renderLayer(); }
+      return;
+    }
+    /* cuentas por cobrar */
+    if (state.pend) {
+      if ((el = find(t, "[data-pendload]"))) return loadPend(attr(el, "data-pendload"));
+      if ((el = find(t, "[data-pendask]"))) { state.pendAsk = attr(el, "data-pendask"); return renderLayer(); }
+      if (find(t, "[data-pendno]")) { state.pendAsk = null; return renderLayer(); }
+      if ((el = find(t, "[data-penddel]"))) {
+        var dp = findPend(attr(el, "data-penddel"));
+        if (dp) { db.pendientes.splice(db.pendientes.indexOf(dp), 1); save(); toast("Cuenta borrada"); }
+        if (dp && String(state.fromPend) === String(dp.id)) state.fromPend = null;
+        state.pendAsk = null; renderLayer(); return render();
+      }
+      if (find(t, '[data-act="close-layer"]') || t.className === "overlay") return closeLayer();
+      return;
+    }
+    if (find(t, '[data-act="show-pend"]')) { state.pend = true; state.pendAsk = null; return renderLayer(); }
+
     /* aviso de pedido nuevo (funciona desde cualquier pantalla) */
     if (!state.pick && !state.pay && (el = find(t, "[data-openped]"))) {
       ped.open = attr(el, "data-openped"); ped.ask = null; ped.banner = null; $("banner").hidden = true; return renderLayer();
     }
     /* comanda en grande */
     if (ped.open && !state.pick && !state.pay) {
-      if ((el = find(t, "[data-pact]"))) { if (attr(el, "data-pact") === "no") { ped.ask = null; return renderLayer(); } return setEstado(attr(el, "data-key"), attr(el, "data-pact")); }
+      if ((el = find(t, "[data-pact]"))) {
+        var pa = attr(el, "data-pact"), pk = attr(el, "data-key");
+        if (pa === "no") { ped.ask = null; return renderLayer(); }
+        setEstado(pk, pa);
+        /* listo para llevar a domicilio: se muestra la ruta para el repartidor */
+        if (pa === "listo" && findPed(pk) && findPed(pk).cliente.entrega === "domicilio") rutaPedido(pk);
+        return;
+      }
       if ((el = find(t, "[data-pask]"))) { ped.ask = attr(el, "data-pask"); return renderLayer(); }
       if ((el = find(t, "[data-pcobrar]"))) return cobrarPedido(attr(el, "data-pcobrar"));
+      if ((el = find(t, "[data-pruta]"))) return rutaPedido(attr(el, "data-pruta"));
       if (find(t, '[data-act="close-ped"]') || t.className === "overlay big-ov") { ped.open = null; ped.ask = null; return renderLayer(); }
       if (find(t, ".wa-cli") || find(t, ".cli a")) return;
       return;
@@ -446,6 +566,7 @@
     if (state.pay) {
       var py = state.pay;
       if (find(t, '[data-act="new-sale"]')) { closeLayer(); return render(); }
+      if (py.done && find(t, '[data-act="ruta-done"]')) return openRuta("Venta #" + py.done.folio + (py.done.nota ? " · " + py.done.nota : ""), py.done.dir);
       if (py.done) return;
       if ((el = find(t, "[data-metodo]"))) { py.metodo = attr(el, "data-metodo"); return renderLayer(); }
       if ((el = find(t, "[data-key]"))) {
@@ -478,8 +599,14 @@
       if (!state.cart.length) state.showTicket = false;
       return render();
     }
-    if ((el = find(t, "[data-tipo]"))) { state.tipo = attr(el, "data-tipo"); return render(); }
-    if (find(t, '[data-act="clear"]')) { state.cart = []; state.nota = ""; state.showTicket = false; state.fromPedido = null; return render(); }
+    if ((el = find(t, "[data-tipo]"))) { state.tipo = attr(el, "data-tipo"); render(); var di = $("dir"); if (di && state.tipo === "domicilio" && !state.dir) di.focus(); return; }
+    if (find(t, '[data-act="maps"]')) {
+      window.open(buscarURL(state.dir), "_blank");
+      toast("En Maps toca el lugar → Compartir → Copiar, y pégalo aquí");
+      return;
+    }
+    if (find(t, '[data-act="clear"]')) { resetTicket(); return render(); }
+    if (find(t, '[data-act="hold"]')) return holdTicket();
     if (find(t, '[data-act="pay"]')) { if (state.cart.length) openPay(); return; }
     if (find(t, '[data-act="show-ticket"]')) { state.showTicket = true; return render(); }
     if (find(t, '[data-act="hide-ticket"]')) { state.showTicket = false; return render(); }
@@ -491,6 +618,11 @@
       var f = Number(attr(el, "data-cancel"));
       db.shift.sales.forEach(function (x) { if (x.folio === f) x.cancelada = true; });
       save(); state.confirm = null; toast("Venta #" + f + " cancelada"); return render();
+    }
+    if ((el = find(t, "[data-ruta]"))) {
+      var rf = Number(attr(el, "data-ruta"));
+      db.shift.sales.forEach(function (x) { if (x.folio === rf) openRuta("Venta #" + x.folio + (x.nota ? " · " + x.nota : ""), x.dir); });
+      return;
     }
     if ((el = find(t, "[data-sale]")) && !find(t, "button")) {
       var fo = Number(attr(el, "data-sale")); state.openSale = state.openSale === fo ? null : fo; state.confirm = null; return render();
@@ -516,7 +648,8 @@
       try {
         var data = JSON.parse($("imp").value);
         if (!data || !data.shift || !data.settings) throw new Error("x");
-        db = data; save(); state.confirm = null; toast("Respaldo restaurado"); return render();
+        db = data; if (!db.pendientes) db.pendientes = []; if (!db.history) db.history = [];
+        save(); state.confirm = null; toast("Respaldo restaurado"); return render();
       } catch (err) { toast("Ese texto no es un respaldo válido"); return; }
     }
   });
@@ -524,6 +657,7 @@
   document.addEventListener("input", function (e) {
     var t = e.target;
     if (t.id === "nota") state.nota = t.value;
+    if (t.id === "dir") state.dir = t.value;
   });
   document.addEventListener("change", function (e) {
     var t = e.target;
@@ -632,7 +766,7 @@
       return '<div class="it"><div class="it-h"><b class="q">' + l.qty + "×</b><b>" + esc(l.name) + "</b>" + (l.optLabel ? "<span>" + esc(l.optLabel) + "</span>" : "") + "</div>" +
         (l.sauces.length ? '<p class="salsa">' + (l.sauces.length === 2 ? "Mitad " + esc(l.sauces[0]) + " / mitad " + esc(l.sauces[1]) : esc(l.sauces[0])) + "</p>" : "") +
         (l.sin.length ? '<p class="sin">SIN: ' + esc(l.sin.join(", ")) + "</p>" : "") +
-        (big ? '<p class="lleva">Lleva: ' + esc(l.lleva.join(", ")) + "</p>" : "") + "</div>";
+        (big && l.lleva.length ? '<p class="lleva">Lleva: ' + esc(l.lleva.join(", ")) + "</p>" : "") + "</div>";
     }).join("");
   }
   function clienteHTML(p) {
@@ -653,6 +787,7 @@
     if (p.estado === "nuevo") { b.push('<button type="button" class="btn ghost" data-pask="rechazar-' + esc(p.key) + '">Rechazar</button>'); b.push('<button type="button" class="btn" data-pact="aceptado" data-key="' + esc(p.key) + '">Aceptar pedido</button>'); }
     if (p.estado === "aceptado") b.push('<button type="button" class="btn" data-pact="listo" data-key="' + esc(p.key) + '">Ya está listo</button>');
     if (p.estado === "aceptado" || p.estado === "listo") b.push('<button type="button" class="btn green" data-pcobrar="' + esc(p.key) + '">Cobrar y entregar</button>');
+    if (p.cliente.entrega === "domicilio" && p.estado !== "rechazado") b.push('<button type="button" class="btn dark" data-pruta="' + esc(p.key) + '">Ruta (QR)</button>');
     return '<div class="row2">' + b.join("") + '</div><a class="wa-cli" href="' + esc(wa) + '" target="_blank" rel="noopener">Escribirle por WhatsApp</a>';
   }
   function ordersHTML() {
@@ -691,6 +826,12 @@
       renderLayer(); refreshPedidos();
     }).catch(function (e) { p.estado = prev; toast("No se pudo guardar: " + e.message); renderLayer(); refreshPedidos(); });
   }
+  function rutaPedido(key) {
+    var p = findPed(key); if (!p) return;
+    var c = p.cliente;
+    openRuta("Pedido web #" + p.folio + " · " + c.nombre + " · " + money(p.total), c.direccion,
+      (c.referencias ? "Referencias: " + c.referencias + ". " : "") + "Tel. " + c.telefono + (c.pago === "efectivo" && c.pagaCon ? " · paga con " + money(c.pagaCon) : ""));
+  }
   /* pasa el pedido al ticket para cobrarlo y que cuente en el corte */
   function cobrarPedido(key) {
     var p = findPed(key); if (!p) return;
@@ -700,8 +841,9 @@
       addLine({ pid: l.pid, opt: l.opt, sauces: l.sauces.slice(), quitar: l.sin.slice(), qty: l.qty, price: l.price });
     });
     state.tipo = p.cliente.entrega === "domicilio" ? "domicilio" : "llevar";
+    state.dir = p.cliente.direccion || "";
     state.nota = "Pedido web #" + p.folio + " · " + p.cliente.nombre;
-    state.fromPedido = key;
+    state.fromPedido = key; state.fromPend = null;
     ped.open = null; state.view = "sell";
     render();
     state.pay = { metodo: p.cliente.pago === "transferencia" ? "transferencia" : "efectivo", recv: p.cliente.pagaCon ? String(p.cliente.pagaCon) : "", done: null };

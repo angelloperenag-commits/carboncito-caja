@@ -40,11 +40,19 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. 777 113 8935.
 - Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $100. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
 - Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50.
-- Alitas, orden de 10 a $110, por defecto "Receta secreta sin salsa"; salsas: piña habanero, mango habanero, tamarindo picante, BBQ picante, BBQ dulce; se permite mitad y mitad. Llevan zanahoria, pepino, jícama en cama de lechuga y ranch (se pueden quitar).
+- Alitas, orden de 10 a $110 o media orden de 5 a $60, por defecto "Receta secreta sin salsa"; salsas: piña habanero, mango habanero, tamarindo picante, BBQ picante, BBQ dulce; se permite mitad y mitad. Llevan zanahoria, pepino, jícama en cama de lechuga y ranch (se pueden quitar).
+- Combo mixto de alitas (`alitas-mixto`): 10 alitas, 2 de cada una de las 5 salsas, $110; medio combo, 1 de cada salsa, $60. No se eligen salsas.
+- Bebidas: el sistema está listo pero todavía no hay ninguna. Para agregar una: `bebida(...)` en `CATALOG` de `shared/core.mjs`, `MENU.drinks` en el menú (`builder: "drink"`, foto WebP opcional en `file`) y `PRODUCTS` con `cat: "drinks"` en la caja, con el mismo id. La sección y la pestaña aparecen solas.
+
+## Caja: domicilio y cuentas por cobrar
+
+- Domicilio: al elegir "Domicilio" en el ticket aparece un campo para la dirección o un enlace de Google Maps. "Buscar en Maps" abre Google Maps en Safari; en Maps se toca el lugar → Compartir → Copiar y se pega en el campo. La dirección se guarda en la venta (`dir`).
+- Ruta de entrega: como WhatsApp no corre en el iPad con iOS 12, la caja muestra un código QR con la ruta de Google Maps para que el repartidor lo escanee con su celular. Aparece al registrar una venta a domicilio, en el detalle de la venta, en los pedidos web a domicilio (botón "Ruta (QR)") y sola al marcar un pedido web como "Ya está listo". Usa `public/js/qrcode.min.js`.
+- Cuentas por cobrar (`db.pendientes`, en el iPad): "Por cobrar" guarda el ticket con un nombre o mesa para quien come en el local; "Por cobrar (n)" en Vender las muestra para abrir, agregar más y cobrar. No cuentan en el corte hasta cobrarlas, y el corte avisa si hay alguna.
 
 ## Pendiente
 
 - Probar la caja en el iPad real: el sitio de pruebas es privado y el inicio de sesión de Netlify no carga en iOS 12, así que el iPad solo puede abrir la caja de producción.
-- Revisar `public/caja/app.js` con acorn (ES2017) y esbuild (`safari12`): el último cambio solo agregó concatenación de cadenas en `clienteHTML`, pero no se pudo correr Node en la computadora donde se hizo.
+- Revisar `public/caja/app.js` con acorn (ES2017) y esbuild (`safari12`): la caja v7 (domicilio, cuentas por cobrar) se escribió en ES5 a mano, pero no se pudo correr Node en la computadora donde se hizo. Se probó en Chromium a tamaño de iPad, no en el iPad real.
 - Limitar intentos de PIN en `/api/pedidos` (hoy no hay límite y un PIN corto se puede adivinar). Mientras tanto, usar un `CAJA_PIN` de al menos 8 dígitos.
 - frakOs (sistema propio para equipos viejos) es investigación a largo plazo, fuera de este repositorio.

@@ -83,6 +83,8 @@
   var TONO = { "Receta secreta sin salsa": "#c8803c", "Piña habanero": "#f2b33c", "Mango habanero": "#ff8f2a", "Tamarindo picante": "#8a2a1c", "BBQ picante": "#a8321a", "BBQ dulce": "#5a2414" };
   /* productos de alitas cuyo ranch se elige en el ticket (con o sin ranch) */
   var RANCH = { "alitas": 1, "alitas-mixto": 1 };
+  /* lugares para bebidas en la pestaña Bebidas (se ven como "Próximamente" mientras no haya) */
+  var BEBIDA_ESPACIOS = 5;
   var TRASH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
   var METODOS = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" };
   var TIPOS = { aqui: "Aquí", llevar: "Para llevar", domicilio: "Domicilio" };
@@ -365,7 +367,12 @@
           "<b>" + esc(p.tile || p.name) + "</b></button>";
       }).join("");
     }
-    if (!tiles) tiles = '<p class="empty">' + (state.cat === "drinks" ? "Todavía no hay bebidas. Se agregan aquí cuando estén confirmadas." : "No hay productos en esta sección.") + "</p>";
+    if (state.cat === "drinks") {
+      /* espacios "Próximamente" hasta completar BEBIDA_ESPACIOS; las bebidas reales los van ocupando */
+      var hay = PRODUCTS.filter(function (p) { return p.cat === "drinks" && !p.hidden; }).length;
+      for (var b = hay; b < BEBIDA_ESPACIOS; b++) tiles += '<div class="tile slot"><span class="slot-pic"></span><b>Próximamente</b><small>Bebida por confirmar</small></div>';
+    }
+    if (!tiles) tiles = '<p class="empty">No hay productos en esta sección.</p>';
     var cats = CATS.map(function (c) { return '<button type="button" data-cat="' + c.id + '" class="' + (c.id === state.cat ? "on" : "") + '">' + esc(c.name) + "</button>"; }).join("") +
       (db.pendientes.length ? '<button type="button" class="pend" data-act="show-pend">Cuentas (' + db.pendientes.length + ")</button>" : "");
     var n = cartCount(), t = cartTotal();

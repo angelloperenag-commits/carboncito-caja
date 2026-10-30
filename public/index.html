@@ -211,6 +211,9 @@ section { display: grid; gap: 12px; scroll-margin-top: 76px; }
   box-shadow: 0 2px 0 rgba(91, 52, 26, .06), 0 6px 14px rgba(91, 52, 26, .08);
   transition: transform .15s ease, box-shadow .15s ease;
 }
+.item.slot { opacity: .6; border-style: dashed; box-shadow: none; cursor: default; }
+.item.slot:active { transform: none; }
+.slot-pic { display: block; width: 46px; height: 58px; margin: auto; border-radius: 10px 10px 14px 14px; border: 2px dashed rgba(91, 52, 26, .35); }
 .item:active { transform: scale(.98); box-shadow: 0 1px 0 rgba(91, 52, 26, .08); }
 .item .pic { width: 84px; height: 70px; filter: drop-shadow(0 4px 5px rgba(60, 30, 10, .22)); display: grid; align-items: center; }
 .item .pic svg { width: 100%; height: 100%; }
@@ -873,16 +876,23 @@ const listPrice = p => p.combo ? p.prices[0][1] : Math.min(...p.prices.map(r => 
 const vb = icon => /burger|double/.test(icon) ? "-5 -4 110 88" : icon === "i-wings" ? "0 0 120 90" : "0 -8 110 86";
 const iconSVG = icon => `<svg viewBox="${vb(icon)}" aria-hidden="true"><use href="#${icon}"/></svg>`;
 
-/* lista: solo lo que se puede vender; una sección sin nada a la venta (combos, bebidas) no se muestra */
+/* Bebidas siempre se ve, con espacios "Próximamente" hasta completar BEBIDA_ESPACIOS; las bebidas reales los van ocupando */
+const BEBIDA_ESPACIOS = 5;
+const slotHTML = () => `<div class="item slot" aria-disabled="true">
+      <span class="pic"><span class="slot-pic" aria-hidden="true"></span></span>
+      <span class="txt"><span class="nm">Próximamente</span><span class="sub">Bebida por confirmar</span></span>
+    </div>`;
+/* lista: solo lo que se puede vender; una sección sin nada a la venta (combos) no se muestra */
 document.querySelectorAll(".items").forEach(box => {
   const list = MENU[box.dataset.cat].filter(sellable), sec = box.closest("section");
-  sec.hidden = !list.length;
-  document.querySelectorAll(`[data-sec="${sec.id}"]`).forEach(a => { a.hidden = !list.length; });
+  const slots = box.dataset.cat === "drinks" ? Math.max(0, BEBIDA_ESPACIOS - list.length) : 0;
+  sec.hidden = !list.length && !slots;
+  document.querySelectorAll(`[data-sec="${sec.id}"]`).forEach(a => { a.hidden = sec.hidden; });
   box.innerHTML = list.map(p => `<button class="item" type="button" data-id="${p.id}" aria-haspopup="dialog">
       <span class="pic" data-mini="${p.id}"></span>
       <span class="txt"><span class="nm">${esc(p.name)}${p.x ? `<span class="x">${p.x}</span>` : ""}</span><span class="sub">${esc(p.desc)}</span></span>
       <span class="go"><span class="from">${!p.combo && p.prices.length > 1 ? "<small>desde</small>" : ""}${money(listPrice(p))}</span><span class="plus" aria-hidden="true">+</span></span>
-    </button>`).join("");
+    </button>`).join("") + Array(slots).fill(0).map(slotHTML).join("");
 });
 
 /* ---------- fotos ---------- */
@@ -1543,7 +1553,7 @@ function closeSheet() {
 const setPressed = (sel_, on) => document.querySelectorAll(sel_).forEach(b => on(b));
 document.addEventListener("click", e => {
   const t = e.target;
-  const btn = t.closest(".item"); if (btn) return openSheet(btn);
+  const btn = t.closest(".item:not(.slot)"); if (btn) return openSheet(btn);
   if (t.closest("#cartbar")) return openSheet(bar, true);
   if (t.closest("#sheet-close") || t === backdrop) return closeSheet();
   if (sheet.hidden) return;

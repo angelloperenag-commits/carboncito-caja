@@ -57,7 +57,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Un solo botón "Hotdog": en su ventana, la pastilla "Con tocino" cambia la línea a `hotdog-tocino` (mismo id del menú y el servidor) y cobra su precio. `hotdog-tocino` tiene `hidden: true` en `PRODUCTS`.
 - Alitas: la pestaña muestra un botón por sabor (color del sabor abajo); al tocarlo se elige la porción (orden completa o media). Para mezclar se agregan varios sabores. No hay mitad y mitad desde la caja (los pedidos web que lo traen se ven igual).
 - Ranch: cuando el ticket tiene alitas aparece "Con ranch / Sin ranch" y aplica a todas las alitas y al combo mixto (`RANCH` en `app.js`).
-- El combo mixto está en Combos. Bebidas siempre tiene pestaña; dice que no hay bebidas mientras no se carguen.
+- El combo mixto está en Combos. Bebidas siempre tiene pestaña, en la caja y en el menú web, con 5 espacios "Próximamente" (`BEBIDA_ESPACIOS` en `app.js` y en el menú) que no se pueden tocar; cada bebida real ocupa uno.
 - Arriba del ticket: Vaciar (rojo, bote de basura) y Por cobrar (verde). Abajo solo Total y Cobrar. "Cuentas (n)" en la fila de categorías abre las cuentas por cobrar.
 
 ## Caja: domicilio y cuentas por cobrar

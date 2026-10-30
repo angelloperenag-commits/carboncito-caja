@@ -94,6 +94,10 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .tile.sabor { border-bottom-width: 7px; border-bottom-style: solid; }
 .tile.sabor b { font-size: 17px; }
 .tile.out { opacity: .45; }
+.tile.slot { opacity: .6; border-style: dashed; box-shadow: none; }
+.tile.slot .slot-pic { display: block; width: 70px; height: 92px; margin: 16px auto 14px; border-radius: 12px 12px 18px 18px; border: 2px dashed rgba(91, 52, 26, .35); }
+.tile.slot b { font-size: 15px; }
+.tile.slot small { display: block; color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
 .tile.draft { opacity: .7; border-style: dashed; }
 .tile.draft::after { content: "Borrador"; position: absolute; top: 8px; left: 8px; background: var(--ink-soft); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
 .tile.out::after { content: "Agotado"; position: absolute; top: 8px; left: 8px; background: var(--err); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }

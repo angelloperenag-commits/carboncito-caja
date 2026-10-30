@@ -40,12 +40,14 @@
     { id: "bbq", cat: "burgers", name: "BBQ", opts: [["Con papas", 70], ["Sin papas", 60]], quitar: ["Queso amarillo", "Jamón", "Tocino"].concat(VEG) },
     { id: "loba", cat: "burgers", name: "Loba", opts: [["Con papas", 80], ["Sin papas", 70]], quitar: ["Queso amarillo", "Jamón", "Salchicha"].concat(VEG) },
     { id: "monstruo", cat: "burgers", name: "Monstruo", opts: [["Con papas", 90], ["Sin papas", 80]], quitar: ["Queso amarillo", "Jamón", "Salchicha", "Tocino", "Piña asada"].concat(VEG) },
-    { id: "hotdog", cat: "snacks", name: "Hotdog sencillo", opts: [["1 hotdog", 20], ["3 hotdogs", 40]], quitar: HD },
-    { id: "hotdog-tocino", cat: "snacks", name: "Hotdog con tocino", opts: [["1 hotdog", 25], ["3 hotdogs", 50]], quitar: HD },
+    /* un solo botón "Hotdog": en su ventana, "Con tocino" cambia al producto hotdog-tocino (mismo id que el menú y el servidor) */
+    { id: "hotdog", cat: "snacks", name: "Hotdog sencillo", tile: "Hotdog", tocino: "hotdog-tocino", opts: [["1 hotdog", 20], ["3 hotdogs", 40]], quitar: HD },
+    { id: "hotdog-tocino", cat: "snacks", name: "Hotdog con tocino", hidden: true, base: "hotdog", img: "hotdog", opts: [["1 hotdog", 25], ["3 hotdogs", 50]], quitar: HD },
     { id: "salchipulpos", cat: "snacks", name: "Salchipulpos", opts: [["Chico (4 pulpos)", 40], ["Grande (6 pulpos)", 60]], quitar: SALSAS_PAPAS },
     { id: "papas", cat: "snacks", name: "Orden de papas", opts: [["Chica", 30], ["Grande", 50]], quitar: SALSAS_PAPAS },
-    { id: "alitas", cat: "wings", name: "Alitas", opts: [["Orden de 10", 110], ["Media orden (5)", 60]], sauces: true, quitar: WINGS },
-    { id: "alitas-mixto", cat: "wings", name: "Combo mixto de alitas", img: "alitas", opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]], quitar: WINGS },
+    /* en Vender se muestran los sabores; cada uno abre las alitas con ese sabor para elegir la porción. El ranch se elige en el ticket. */
+    { id: "alitas", cat: "wings", name: "Alitas", opts: [["Orden de 10", 110], ["Media orden (5)", 60]], porcion: ["Orden completa (10 piezas)", "Media orden (5 piezas)"], sauces: true, quitar: WINGS },
+    { id: "alitas-mixto", cat: "combos", name: "Combo mixto de alitas", img: "alitas", opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]], quitar: WINGS },
     combo("combo-carboncito", "CARBONCITO", "Hamburguesa sencilla, papas, 4 alitas y refresco de 600 ml", 100, [
       part("sencilla", "Hamburguesa sencilla"), part("papas", "Papas", { pend: "Falta confirmar la porción" }),
       part("alitas", "4 alitas"), part(null, "Refresco de 600 ml", { pend: "Falta confirmar marca y sabor" })
@@ -63,7 +65,8 @@
       part("alitas", "Media orden 1", { unSabor: true }), part("alitas", "Media orden 2", { unSabor: true }), part("alitas", "Media orden 3", { unSabor: true })
     ], { repetidos: null })
   ];
-  CATS = CATS.filter(function (c) { return PRODUCTS.some(function (p) { return p.cat === c.id; }); });
+  /* Bebidas se queda aunque esté vacía, para que se vea dónde van a ir */
+  CATS = CATS.filter(function (c) { return c.id === "drinks" || PRODUCTS.some(function (p) { return p.cat === c.id; }); });
   function imgOf(p) { var f = p.img == null ? p.id : p.img; return f ? '<img src="img/' + f + '.png" alt="">' : ""; }
   /* se puede vender: no es borrador, está disponible y todas sus opciones tienen precio */
   function sellable(p) { return !p.draft && p.disponible !== false && p.opts.every(function (o) { return typeof o[1] === "number"; }); }
@@ -76,6 +79,11 @@
     return L;
   }
   var SAUCES = ["Receta secreta sin salsa", "Piña habanero", "Mango habanero", "Tamarindo picante", "BBQ picante", "BBQ dulce"];
+  /* color de cada sabor para su tarjeta (los mismos tonos del menú) */
+  var TONO = { "Receta secreta sin salsa": "#c8803c", "Piña habanero": "#f2b33c", "Mango habanero": "#ff8f2a", "Tamarindo picante": "#8a2a1c", "BBQ picante": "#a8321a", "BBQ dulce": "#5a2414" };
+  /* productos de alitas cuyo ranch se elige en el ticket (con o sin ranch) */
+  var RANCH = { "alitas": 1, "alitas-mixto": 1 };
+  var TRASH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
   var METODOS = { efectivo: "Efectivo", transferencia: "Transferencia", tarjeta: "Tarjeta" };
   var TIPOS = { aqui: "Aquí", llevar: "Para llevar", domicilio: "Domicilio" };
 
@@ -158,7 +166,7 @@
      ========================================================= */
   var state = {
     view: "sell", cat: "burgers", showTicket: false,
-    cart: [], tipo: "aqui", nota: "", dir: "", fromPend: null,
+    cart: [], tipo: "aqui", nota: "", dir: "", fromPend: null, ranch: true,
     openSale: null, confirm: null,
     pick: null, pay: null, pend: false, pendAsk: null, qr: null
   };
@@ -215,7 +223,7 @@
     if (state.tipo === "domicilio" && state.dir.trim()) { p.tipo = "domicilio"; p.dir = state.dir.trim(); }
     else if (state.tipo !== "aqui" || !p.tipo) p.tipo = state.tipo;
   }
-  function resetTicket() { state.cart = []; state.nota = ""; state.tipo = "aqui"; state.dir = ""; state.fromPend = null; state.fromPedido = null; state.showTicket = false; }
+  function resetTicket() { state.cart = []; state.ranch = true; state.nota = ""; state.tipo = "aqui"; state.dir = ""; state.fromPend = null; state.fromPedido = null; state.showTicket = false; }
   function holdTicket() {
     if (!state.cart.length) return;
     var nm = state.nota.trim();
@@ -244,7 +252,7 @@
       mergeLines(p.cart, state.cart); mergeDest(p); save();
       toast("Se sumó a la cuenta de " + p.nota);
     }
-    state.cart = JSON.parse(JSON.stringify(p.cart)); state.nota = p.nota; state.tipo = p.tipo; state.dir = p.dir || "";
+    state.cart = JSON.parse(JSON.stringify(p.cart)); state.ranch = conRanch(state.cart); state.nota = p.nota; state.tipo = p.tipo; state.dir = p.dir || "";
     state.fromPend = p.id; state.fromPedido = null; state.showTicket = true; state.view = "sell";
     closeLayer(); render();
   }
@@ -311,6 +319,20 @@
     for (var i = 0; i < state.cart.length; i++) if (state.cart[i].key === l.key) { state.cart[i].qty += l.qty; return; }
     state.cart.push(l);
   }
+  /* ranch de las alitas: se elige una vez en el ticket y aplica a todas sus alitas */
+  function hayAlitas() { return state.cart.some(function (l) { return RANCH[l.pid]; }); }
+  function conRanch(cart) { return !cart.some(function (l) { return RANCH[l.pid] && l.quitar.indexOf("Ranch") >= 0; }); }
+  function setRanch(con) {
+    state.ranch = con;
+    var lines = state.cart; state.cart = [];
+    lines.forEach(function (l) {
+      if (RANCH[l.pid]) {
+        l.quitar = l.quitar.filter(function (q) { return q !== "Ranch"; });
+        if (!con) l.quitar.push("Ranch");
+      }
+      addLine(l);   /* recalcula la clave y junta las líneas que quedaron iguales */
+    });
+  }
 
   /* =========================================================
      VISTAS
@@ -326,16 +348,26 @@
     else v.innerHTML = settingsHTML();
   }
 
+  /* tarjetas: solo foto grande y nombre. Los precios se ven en el ticket. */
   function sellHTML() {
-    var tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat; }).map(function (p) {
-      var out = db.settings.soldOut[p.id] || p.disponible === false, draft = !sellable(p) && p.disponible !== false;
-      var precio = p.opts.every(function (o) { return typeof o[1] === "number"; })
-        ? (p.cat === "burgers" ? money(price(p, 0)) : (p.opts.length > 1 ? "desde " : "") + money(minPrice(p))) : "Sin precio";
-      return '<button type="button" class="tile' + (draft ? " draft" : out ? " out" : "") + '" data-add="' + p.id + '">' + imgOf(p) +
-        "<b>" + esc(p.name) + "</b>" + (p.parts ? "<small>" + esc(p.desc) + "</small>" : "") + "<span>" + precio + "</span></button>";
-    }).join("");
+    var tiles;
+    if (state.cat === "wings") {
+      /* alitas: un botón por sabor */
+      var agotadas = db.settings.soldOut.alitas;
+      tiles = SAUCES.map(function (n) {
+        return '<button type="button" class="tile sabor' + (agotadas ? " out" : "") + '" data-sabor="' + esc(n) + '" style="border-bottom-color:' + TONO[n] + '">' +
+          '<img src="img/alitas.png" alt=""><b>' + esc(n) + "</b></button>";
+      }).join("");
+    } else {
+      tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat && !p.hidden; }).map(function (p) {
+        var out = db.settings.soldOut[p.id] || p.disponible === false, draft = !sellable(p) && p.disponible !== false;
+        return '<button type="button" class="tile' + (draft ? " draft" : out ? " out" : "") + '" data-add="' + p.id + '">' + imgOf(p) +
+          "<b>" + esc(p.tile || p.name) + "</b></button>";
+      }).join("");
+    }
+    if (!tiles) tiles = '<p class="empty">' + (state.cat === "drinks" ? "Todavía no hay bebidas. Se agregan aquí cuando estén confirmadas." : "No hay productos en esta sección.") + "</p>";
     var cats = CATS.map(function (c) { return '<button type="button" data-cat="' + c.id + '" class="' + (c.id === state.cat ? "on" : "") + '">' + esc(c.name) + "</button>"; }).join("") +
-      (db.pendientes.length ? '<button type="button" class="pend" data-act="show-pend">Por cobrar (' + db.pendientes.length + ")</button>" : "");
+      (db.pendientes.length ? '<button type="button" class="pend" data-act="show-pend">Cuentas (' + db.pendientes.length + ")</button>" : "");
     var n = cartCount(), t = cartTotal();
     return '<div class="sell' + (state.showTicket ? " show-ticket" : "") + '">' +
       '<div class="catalog"><div class="cats">' + cats + '</div><div class="grid">' + tiles + "</div>" +
@@ -352,13 +384,17 @@
     var t = cartTotal(), dis = state.cart.length ? "" : " disabled";
     var dir = state.tipo === "domicilio" ? '<div class="dir"><input id="dir" type="text" placeholder="Dirección o enlace de Google Maps" value="' + esc(state.dir) + '" autocomplete="off">' +
       '<button type="button" data-act="maps">Buscar en Maps</button></div>' : "";
-    return '<div class="t-head"><button type="button" class="back-cat" data-act="hide-ticket">‹ Productos</button><h2>Ticket</h2><span class="folio">' +
-      (state.fromPend ? "Cuenta por cobrar" : "Venta #" + db.shift.next) + "</span></div>" +
+    var ranch = hayAlitas() ? '<div class="seg ranch"><span>Alitas</span><button type="button" data-ranch="1" class="' + (state.ranch ? "on" : "") + '">Con ranch</button>' +
+      '<button type="button" data-ranch="0" class="' + (state.ranch ? "" : "on") + '">Sin ranch</button></div>' : "";
+    /* arriba: vaciar (rojo, con bote de basura) y por cobrar (verde), lejos del botón de cobrar */
+    return '<div class="t-head"><button type="button" class="back-cat" data-act="hide-ticket">‹ Productos</button>' +
+      '<div class="t-title"><h2>Ticket</h2><span class="folio">' + (state.fromPend ? "Cuenta por cobrar" : "Venta #" + db.shift.next) + "</span></div>" +
+      '<button type="button" class="t-btn trash" data-act="clear" aria-label="Vaciar ticket"' + dis + ">" + TRASH + "Vaciar</button>" +
+      '<button type="button" class="t-btn hold" data-act="hold"' + dis + ">Por cobrar</button></div>" +
       '<div class="lines">' + lines + "</div>" +
-      '<div class="t-meta"><div class="seg">' + tipos + "</div>" + dir + '<input id="nota" type="text" placeholder="Nombre del cliente o mesa" value="' + esc(state.nota) + '" autocomplete="off"></div>' +
+      '<div class="t-meta">' + ranch + '<div class="seg">' + tipos + "</div>" + dir + '<input id="nota" type="text" placeholder="Nombre del cliente o mesa" value="' + esc(state.nota) + '" autocomplete="off"></div>' +
       '<div class="t-foot"><div class="total"><span>Total</span><b>' + money(t) + "</b></div>" +
-      '<div class="row2"><button type="button" class="btn ghost" data-act="clear"' + dis + '>Vaciar</button><button type="button" class="btn ghost" data-act="hold"' + dis + '>Por cobrar</button>' +
-      '<button type="button" class="btn" data-act="pay"' + dis + ">Cobrar " + money(t) + "</button></div></div>";
+      '<button type="button" class="btn pay-btn" data-act="pay"' + dis + ">Cobrar " + money(t) + "</button></div>";
   }
 
   function liveSales() { return db.shift.sales.filter(function (s) { return !s.cancelada; }); }
@@ -501,8 +537,9 @@
      ========================================================= */
   /* lo elegido en cada parte de un combo; una parte de un solo sabor empieza sin elegir */
   function basePart(c) { var r = c.pid ? prod(c.pid) : null; return { sauces: r && r.sauces && !c.unSabor ? [SAUCES[0]] : [], quitar: [] }; }
-  function openPick(p) {
-    state.pick = { pid: p.id, opt: 0, sauces: p.sauces ? [SAUCES[0]] : [], quitar: [], qty: 1, comps: p.parts ? p.parts.map(basePart) : [] };
+  /* sabor: alitas abiertas desde la tarjeta de un sabor (solo se elige la porción) */
+  function openPick(p, sabor) {
+    state.pick = { pid: p.id, opt: 0, sauces: sabor ? [sabor] : p.sauces ? [SAUCES[0]] : [], sabor: sabor || "", quitar: [], qty: 1, comps: p.parts ? p.parts.map(basePart) : [] };
     renderLayer();
   }
   /* combo: cada parte con sus salsas y lo que se le puede quitar */
@@ -523,29 +560,34 @@
     if (p.parts) {
       var foot = venta
         ? '<div class="m-foot"><div class="step"><button type="button" data-pq="-1">−</button><output>' + s.qty + '</output><button type="button" data-pq="1">+</button></div>' +
-          '<button type="button" class="btn" data-act="add-line">Agregar · ' + money(price(p, 0) * s.qty) + "</button></div>"
+          '<button type="button" class="btn" data-act="add-line">Agregar</button></div>'
         : '<div class="m-foot"><button type="button" class="btn" disabled>Borrador: todavía no se vende</button></div>';
       return '<div class="overlay"><div class="modal">' +
         '<div class="m-head">' + imgOf(p) + "<h2>" + esc(p.name) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
-        '<div class="m-body"><p class="note">' + esc(p.desc) + (venta ? " · " + money(price(p, 0)) : "") + "</p>" +
+        '<div class="m-body"><p class="note">' + esc(p.desc) + "</p>" +
         (venta ? "" : '<div class="confirm"><p><b>Falta para venderlo:</b></p><p>' + pendientes(p).map(esc).join("<br>") + "</p></div>") +
         partsHTML(p, s) + "</div>" + foot + "</div></div>";
     }
-    var opts = p.opts.length > 1 ? "<h4>Opción</h4>" + p.opts.map(function (o, i) {
-      return '<button type="button" class="opt' + (s.opt === i ? " on" : "") + '" data-popt="' + i + '"><i class="dot"></i><span>' + esc(o[0]) + "</span><b>" + money(price(p, i)) + "</b></button>";
+    /* sin precios: el desglose se ve en el ticket */
+    var labels = s.sabor && p.porcion ? p.porcion : p.opts.map(function (o) { return o[0]; });
+    var opts = p.opts.length > 1 ? "<h4>" + (s.sabor ? "Porción" : "Opción") + "</h4>" + labels.map(function (o, i) {
+      return '<button type="button" class="opt' + (s.opt === i ? " on" : "") + '" data-popt="' + i + '"><i class="dot"></i><span>' + esc(o) + "</span></button>";
     }).join("") : "";
-    var sauces = p.sauces ? "<h4>Salsa <small>· toca dos para mitad y mitad</small></h4><div class='chips'>" + SAUCES.map(function (n) {
+    var base = p.base ? prod(p.base) : p, tocino = base.tocino
+      ? "<h4>Tocino</h4><div class='chips'><button type='button' class='chip toggle" + (p.base ? " on" : "") + "' data-act='tocino'>" + (p.base ? "✓ " : "") + "Con tocino</button></div>" : "";
+    var sauces = p.sauces && !s.sabor ? "<h4>Salsa <small>· toca dos para mitad y mitad</small></h4><div class='chips'>" + SAUCES.map(function (n) {
       return '<button type="button" class="chip' + (s.sauces.indexOf(n) >= 0 ? " on" : "") + '" data-sauce="' + esc(n) + '">' + esc(n) + "</button>";
     }).join("") + "</div>" : "";
-    var quitar = p.quitar.length ? "<h4>Quitar <small>· toca lo que no lleva</small></h4><div class='chips'>" + p.quitar.map(function (n) {
+    /* el ranch de las alitas se elige en el ticket */
+    var lista = RANCH[p.id] ? [] : p.quitar;
+    var quitar = lista.length ? "<h4>Quitar <small>· toca lo que no lleva</small></h4><div class='chips'>" + lista.map(function (n) {
       return '<button type="button" class="chip' + (s.quitar.indexOf(n) >= 0 ? " off" : "") + '" data-quitar="' + esc(n) + '">' + esc(n) + "</button>";
     }).join("") + "</div>" : "";
-    var total = price(p, s.opt) * s.qty;
     return '<div class="overlay"><div class="modal">' +
-      '<div class="m-head">' + imgOf(p) + "<h2>" + esc(p.name) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
-      '<div class="m-body">' + (p.desc ? '<p class="note">' + esc(p.desc) + "</p>" : "") + opts + sauces + quitar + "</div>" +
+      '<div class="m-head">' + imgOf(base) + "<h2>" + esc(s.sabor ? "Alitas · " + s.sabor : (base.tile || p.name)) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
+      '<div class="m-body">' + (p.desc ? '<p class="note">' + esc(p.desc) + "</p>" : "") + opts + tocino + sauces + quitar + "</div>" +
       '<div class="m-foot"><div class="step"><button type="button" data-pq="-1">−</button><output>' + s.qty + '</output><button type="button" data-pq="1">+</button></div>' +
-      '<button type="button" class="btn" data-act="add-line">Agregar · ' + money(total) + "</button></div></div></div>";
+      '<button type="button" class="btn" data-act="add-line">Agregar</button></div></div></div>';
   }
 
   /* =========================================================
@@ -688,6 +730,11 @@
         if (k >= 0) s.quitar.splice(k, 1); else s.quitar.push(q);
         return renderLayer();
       }
+      /* hotdog: "Con tocino" cambia entre el sencillo y el de tocino (se conservan cantidad y lo que se quitó) */
+      if (find(t, '[data-act="tocino"]')) {
+        if (!p.base && db.settings.soldOut[p.tocino]) { toast("El hotdog con tocino está marcado como agotado"); return; }
+        s.pid = p.base ? p.base : p.tocino; return renderLayer();
+      }
       /* combo: salsa o ingrediente de una parte */
       if ((el = find(t, "[data-part]"))) {
         var pi = Number(attr(el, "data-part")), pc = p.parts[pi], ps = s.comps[pi], pv;
@@ -713,7 +760,9 @@
           if (falta) { toast("Elige el sabor de: " + falta); return; }
           if (p.repetidos === false && unos.some(function (x, ix) { return unos.indexOf(x) !== ix; })) { toast("En este combo los sabores no se repiten"); return; }
         }
-        addLine({ pid: s.pid, opt: s.opt, sauces: s.sauces.slice(), quitar: s.quitar.slice(), qty: s.qty, price: price(p, s.opt),
+        var quita = s.quitar.slice();
+        if (RANCH[p.id] && !state.ranch) quita.push("Ranch");   /* toma lo elegido en el ticket */
+        addLine({ pid: s.pid, opt: s.opt, sauces: s.sauces.slice(), quitar: quita, qty: s.qty, price: price(p, s.opt),
           comps: s.comps.map(function (c) { return { sauces: c.sauces.slice(), quitar: c.quitar.slice() }; }) });
         closeLayer(); return render();
       }
@@ -746,6 +795,11 @@
 
     /* vender */
     if ((el = find(t, "[data-cat]"))) { state.cat = attr(el, "data-cat"); return render(); }
+    if ((el = find(t, "[data-sabor]"))) {
+      if (db.settings.soldOut.alitas) { toast("Las alitas están marcadas como agotadas"); return; }
+      return openPick(prod("alitas"), attr(el, "data-sabor"));
+    }
+    if ((el = find(t, "[data-ranch]"))) { setRanch(attr(el, "data-ranch") === "1"); return render(); }
     if ((el = find(t, "[data-add]"))) {
       var pr = prod(attr(el, "data-add"));
       if (db.settings.soldOut[pr.id] || pr.disponible === false) { toast(pr.name + " no está disponible"); return; }
@@ -1049,6 +1103,7 @@
       addLine({ pid: l.pid, opt: l.opt, sauces: l.sauces.slice(), quitar: l.sin.slice(), qty: l.qty, price: l.price,
         comps: (l.componentes || []).map(function (c) { return { sauces: c.sauces.slice(), quitar: c.sin.slice() }; }) });
     });
+    state.ranch = conRanch(state.cart);
     state.tipo = p.cliente.entrega === "domicilio" ? "domicilio" : "llevar";
     state.dir = p.cliente.direccion || "";
     state.nota = "Pedido web #" + p.folio + " · " + p.cliente.nombre;

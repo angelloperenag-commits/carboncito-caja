@@ -51,6 +51,15 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
   Al confirmar, quitar el `pend` o poner el precio/`repetidos` en los tres catálogos (servidor, menú y caja). El pedido lleva `combo: [{ sauces, off }]` por parte y el servidor regresa `componentes: [{ label, sauces, sin }]`.
 - Bebidas: el sistema está listo pero todavía no hay ninguna (no se venden sueltas hasta tener catálogo y precios). Para agregar una: `bebida(nombre, [[presentación, precio], ...])` en `CATALOG` de `shared/core.mjs`; en el menú `MENU.drinks` con `desc`, `prices`, `file` (foto WebP en `img/`; sin foto se ve un marcador) y `disponible`; en la caja `PRODUCTS` con `cat: "drinks"`, `desc`, `img` (PNG en `caja/img/`, iOS 12 no lee WebP) y `disponible`. Mismo id en los tres. La sección del menú solo aparece si hay alguna disponible con precio; en la caja también se puede marcar Agotado en Ajustes.
 
+## Caja: pantalla de venta
+
+- Las tarjetas y las ventanas de personalización no muestran precios: solo foto grande y nombre. El desglose de precios está en el ticket (y en Ajustes). El menú web sí muestra precios.
+- Un solo botón "Hotdog": en su ventana, la pastilla "Con tocino" cambia la línea a `hotdog-tocino` (mismo id del menú y el servidor) y cobra su precio. `hotdog-tocino` tiene `hidden: true` en `PRODUCTS`.
+- Alitas: la pestaña muestra un botón por sabor (color del sabor abajo); al tocarlo se elige la porción (orden completa o media). Para mezclar se agregan varios sabores. No hay mitad y mitad desde la caja (los pedidos web que lo traen se ven igual).
+- Ranch: cuando el ticket tiene alitas aparece "Con ranch / Sin ranch" y aplica a todas las alitas y al combo mixto (`RANCH` en `app.js`).
+- El combo mixto está en Combos. Bebidas siempre tiene pestaña; dice que no hay bebidas mientras no se carguen.
+- Arriba del ticket: Vaciar (rojo, bote de basura) y Por cobrar (verde). Abajo solo Total y Cobrar. "Cuentas (n)" en la fila de categorías abre las cuentas por cobrar.
+
 ## Caja: domicilio y cuentas por cobrar
 
 - Domicilio: al elegir "Domicilio" en el ticket aparece un campo para la dirección o un enlace de Google Maps. "Buscar en Maps" abre Google Maps en Safari; en Maps se toca el lugar → Compartir → Copiar y se pega en el campo. La dirección se guarda en la venta (`dir`).

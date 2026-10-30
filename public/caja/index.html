@@ -89,13 +89,13 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   box-shadow: 0 2px 0 rgba(91, 52, 26, .08);
 }
 .tile:active { background: #f3e5cd; }
-.tile img { display: block; width: 100%; height: 92px; object-fit: contain; margin: 0 auto 6px; }
-.tile b { display: block; font-size: 16px; text-transform: uppercase; letter-spacing: .02em; }
-.tile span { display: block; color: var(--terra); font-weight: 700; font-size: 16px; margin-top: 2px; }
+.tile img { display: block; width: 100%; height: 124px; object-fit: contain; margin: 0 auto 8px; }
+.tile b { display: block; font-size: 19px; line-height: 1.2; text-transform: uppercase; letter-spacing: .02em; }
+.tile.sabor { border-bottom-width: 7px; border-bottom-style: solid; }
+.tile.sabor b { font-size: 17px; }
 .tile.out { opacity: .45; }
 .tile.draft { opacity: .7; border-style: dashed; }
 .tile.draft::after { content: "Borrador"; position: absolute; top: 8px; left: 8px; background: var(--ink-soft); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
-.tile small { display: block; color: var(--ink-soft); font-size: 12px; line-height: 1.25; margin: 2px 0; }
 .tile.out::after { content: "Agotado"; position: absolute; top: 8px; left: 8px; background: var(--err); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
 
 .ticket {
@@ -104,8 +104,20 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   padding-right: env(safe-area-inset-right);
 }
 .t-head { flex: none; display: flex; align-items: center; padding: 12px 14px 8px; }
-.t-head h2 { margin: 0 auto 0 0; font-family: Georgia, serif; font-size: 22px; color: var(--terra); }
-.t-head .folio { color: var(--ink-soft); font-size: 14px; }
+.t-title { margin-right: auto; min-width: 0; }
+.t-head h2 { margin: 0; font-family: Georgia, serif; font-size: 22px; color: var(--terra); line-height: 1.1; }
+.t-head .folio { display: block; color: var(--ink-soft); font-size: 13px; }
+.t-btn { flex: none; display: flex; align-items: center; border: 0; border-radius: 10px; padding: 9px 11px; margin-left: 6px; font-weight: 700; font-size: 14px; color: #fff; }
+.t-btn svg { margin-right: 4px; }
+.t-btn.trash { background: var(--err); }
+.t-btn.hold { background: #1f9d55; }
+.t-btn[disabled] { opacity: .35; }
+.pay-btn { width: 100%; }
+.seg.ranch { margin-bottom: 8px; align-items: center; }
+.seg.ranch span { flex: none; padding: 0 8px 0 6px; font-size: 13px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; }
+.cats button.pend { background: #e7f6ec; border-color: #1f9d55; color: #146c3a; }
+.chip.toggle.on { background: #1f9d55; border-color: #1f9d55; color: #fff; }
+.grid .empty { grid-column: 1 / -1; }
 .lines { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 10px; }
 .empty { color: var(--ink-soft); text-align: center; padding: 30px 12px; font-size: 15px; }
 .line { display: flex; align-items: center; padding: 9px 4px; border-bottom: 1px solid var(--line); }

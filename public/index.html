@@ -1,5 +1,7 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Menú El Carboncito</title>
+<!-- que el teléfono no convierta el número en enlace azul -->
+<meta name="format-detection" content="telephone=no">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -173,7 +175,8 @@ body { position: relative; }
 .btn.wa { background: var(--wa); border-color: var(--wa); color: #fff; box-shadow: 0 3px 0 #146c3a; }
 .btn svg { width: 18px; height: 18px; flex: none; }
 .btn:focus-visible, .tabs a:focus-visible, .item:focus-visible, .sheet-close:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
-.phone { font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+/* blanco siempre: algunos teléfonos lo convierten en enlace azul y no se lee sobre el fondo café */
+.info .phone, .phone a, .info a[href^="tel"] { color: #fff; text-decoration: none; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
 
 /* ---------- navegación ---------- */
 .tabs {
@@ -753,9 +756,10 @@ const ING = {
   /* salchipulpos y papas */
   sp_papas:  { name: "Papas", file: "sp-papas.webp", ar: .46, tone: "#e9b43c" },
   salchipulpo: { name: "Salchipulpos", file: "salchipulpos-4.webp", ar: .65, tone: "#c8502c" },
-  sp_queso:  { name: "Queso de nachos", file: "sp-queso-nachos.webp", sy: .55, at: { x: 50, y: 26, w: 44 }, ar: .58, tone: "#f4a91c", wipe: true },
-  sp_catsup: { name: "Catsup", file: "sp-catsup.webp", sy: .55, at: { x: 44, y: 29, w: 40 }, ar: .44, tone: "#b81d12", wipe: true },
-  sp_valentina: { name: "Valentina", file: "sp-valentina.webp", sy: .5, at: { x: 57, y: 28, w: 40 }, ar: .6, tone: "#8a1a0a", wipe: true },
+  /* salsas en potes negros al fondo de la canasta */
+  sp_queso:  { name: "Queso de nachos", file: "queso-nachos-bote.webp", at: { x: 22, y: 31, w: 24 }, ar: .81, tone: "#f4a91c" },
+  sp_catsup: { name: "Catsup", file: "catsup-bote.webp", at: { x: 50, y: 33, w: 24 }, ar: .81, tone: "#b81d12" },
+  sp_valentina: { name: "Valentina", file: "valentina-bote.webp", at: { x: 78, y: 31, w: 24 }, ar: .81, tone: "#8a1a0a" },
 
   /* bebidas: la foto la pone cada producto (file); sin foto se ve el marcador con su nombre */
   bebida: { name: "Bebida", ar: 1.6, tone: "#2f6db5", ghost: true },
@@ -1002,32 +1006,33 @@ const COMPOSE = {
     if (!isOff(s, "ranch")) { const a = ING.ranch.at; L.push({ key: "ranch", ing: "ranch", x: a.x, y: a.y, w: a.w, z: 33, enter: "drop", order: 5 }); }
     const n = s.n || (s.opt === 1 ? 5 : 10), media = n <= 5, spots = (media ? WING_SPOTS_5 : WING_SPOTS_10).slice(0, n);
     const ids = p.mix ? spots.map((_, i) => SAUCES.filter(x => !x.plain)[i % 5].id)
-      : s.alas ? alasLista(s.alas).slice(0, n)
+      /* con el contador: primero las que ya tienen sabor y el resto con la receta secreta, para que nunca se vea la canasta vacía */
+      : s.alas ? alasLista(s.alas).slice(0, n).concat(Array(Math.max(0, n - alasTotal(s.alas))).fill("base"))
       : spots.map(() => s.sauces[0] || SAUCES[0].id);
     const vistas = {};
     ids.forEach((id, i) => {
       const [x, y, rot] = spots[i];
       /* clave por sabor y número: al sumar una, cae la nueva y las demás se acomodan */
       const k = vistas[id] = (vistas[id] || 0) + 1;
-      L.push({ key: "ala-" + id + "-" + k, ing: "ala", file: `alitas-${id}-1.webp`, x, y, w: media ? 30 : 27, rot, z: 40 + i, enter: "drop", order: 6 + i, seq: i + 1 });
+      const foto = id === "base" ? SAUCES[0].id : id;
+      L.push({ key: "ala-" + id + "-" + k, ing: "ala", file: `alitas-${foto}-1.webp`, x, y, w: media ? 30 : 27, rot, z: 40 + i, enter: "drop", order: 6 + i, seq: i + 1 });
     });
     return { H, L, fit: 1, shadow: { x: 50, w: 94 } };
   },
 
-  /* canasta con papas; los pulpos encima (si lleva) y las salsas al final */
+  /* canasta con las salsas en potes al fondo, las papas y los pulpos encima (si lleva) */
   loaded(p, s) {
     const H = 62, big = s.opt === 1, L = [];
     basket(L, false);
-    L.push({ key: "papas", ing: "sp_papas", x: 50, y: 12, w: big ? 72 : 62, z: 2, enter: "drop", order: 1 });
+    ["sp_queso", "sp_catsup", "sp_valentina"].forEach((id, i) => {
+      if (!p.recipe.includes(id) || isOff(s, id)) return; const a = ING[id].at;
+      L.push({ key: id, ing: id, x: a.x, y: a.y, w: a.w, z: 2 + i, enter: "drop", order: 1 + i });
+    });
+    L.push({ key: "papas", ing: "sp_papas", x: 50, y: 10, w: big ? 70 : 60, z: 10, enter: "drop", order: 4 });
     if (p.pulpos) {
       const six = p.pulpos[s.opt] === 6;
-      L.push({ key: "pulpos", ing: "salchipulpo", file: six ? "salchipulpos-6.webp" : "salchipulpos-4.webp", x: 50, y: 14, w: six ? 64 : 54, z: 3, enter: "pop", order: 2 });
+      L.push({ key: "pulpos", ing: "salchipulpo", file: six ? "salchipulpos-6.webp" : "salchipulpos-4.webp", x: 50, y: 12, w: six ? 62 : 52, z: 11, enter: "pop", order: 5 });
     }
-    const dy = p.pulpos ? 0 : -4;   /* sin pulpos las salsas caen directo sobre las papas */
-    ["sp_queso", "sp_catsup", "sp_valentina"].forEach((id, i) => {
-      if (!p.recipe.includes(id) || isOff(s, id)) return; const g = ING[id], a = g.at;
-      L.push({ key: id, ing: id, x: a.x, y: a.y + dy, w: a.w, sy: g.sy, z: 4 + i, enter: "wipe", order: 3 + i });
-    });
     return { H, L, fit: 1, shadow: { x: 50, w: 94 } };
   },
 

@@ -321,13 +321,15 @@
     return ks.length === 1 ? [ks[0]] : ks.map(function (n) { return a[n] + " × " + n; });
   }
   function piezasParte(c) { return c.piezas || (c.opt === 1 ? 5 : 10); }
+  /* todas con receta secreta de entrada */
+  function alasBase(n) { var a = {}; if (n) a[SAUCES[0]] = n; return a; }
   /* filas con − y + por sabor; extra = atributos para saber a qué parte del combo pertenece */
   function contadorHTML(a, n, extra) {
     var t = alasTot(a);
     return "<p class=\"note\">Elige el sabor de cada alita. Llevas <b>" + t + " de " + n + "</b>" + (t === n ? " ✓" : "") + ".</p><div class=\"alas\">" + SAUCES.map(function (s) {
       return "<div class=\"ala-row\"><i style=\"background:" + TONO[s] + "\"></i><span>" + esc(s) + "</span><div class=\"step\">" +
         "<button type=\"button\"" + extra + " data-cala=\"" + esc(s) + "\" data-cd=\"-1\"" + (a[s] ? "" : " disabled") + ">−</button><output>" + (a[s] || 0) + "</output>" +
-        "<button type=\"button\"" + extra + " data-cala=\"" + esc(s) + "\" data-cd=\"1\"" + (t < n ? "" : " disabled") + ">+</button></div></div>";
+        "<button type=\"button\"" + extra + " data-cala=\"" + esc(s) + "\" data-cd=\"1\"" + (t < n || (s !== SAUCES[0] && a[SAUCES[0]]) ? "" : " disabled") + ">+</button></div></div>";
     }).join("") + "</div>";
   }
   /* opción elegida en un combo: en la caja se guarda el id; en un pedido web llega el nombre */
@@ -580,11 +582,16 @@
      ========================================================= */
   /* lo elegido en cada parte de un combo; una parte de un solo sabor empieza sin elegir */
   /* las alitas de un combo se reparten por sabor con el contador (alas); las partes de un solo sabor, con un botón */
-  function basePart(c) { var r = c.pid ? prod(c.pid) : null; return { sauces: [], quitar: [], opcion: "", alas: r && r.sauces && !c.unSabor ? {} : null }; }
+  /* las alitas de un combo se reparten por sabor con el contador (alas), todas con receta secreta de entrada; las partes de un solo sabor, con un botón */
+  function basePart(c) {
+    var r = c.pid ? prod(c.pid) : null, alas = null;
+    if (r && r.sauces && !c.unSabor) { alas = {}; alas[SAUCES[0]] = piezasParte(c); }
+    return { sauces: [], quitar: [], opcion: "", alas: alas };
+  }
   /* sabor: alitas abiertas desde la tarjeta de un sabor (solo se elige la porción) */
   /* perso: "Alitas personalizadas" (porción y contador de sabores) */
   function openPick(p, sabor, perso) {
-    state.pick = { pid: p.id, opt: 0, sauces: sabor ? [sabor] : [], sabor: sabor || "", perso: !!perso, alas: {}, quitar: [], qty: 1, comps: p.parts ? p.parts.map(basePart) : [] };
+    state.pick = { pid: p.id, opt: 0, sauces: sabor ? [sabor] : [], sabor: sabor || "", perso: !!perso, alas: alasBase(perso ? p.piezas[0] : 0), quitar: [], qty: 1, comps: p.parts ? p.parts.map(basePart) : [] };
     renderLayer();
   }
   /* combo: cada parte con sus salsas y lo que se le puede quitar */
@@ -774,17 +781,25 @@
       if ((el = find(t, "[data-popt]"))) {
         s.opt = Number(attr(el, "data-popt"));
         /* alitas personalizadas: si baja la porción, se quitan las últimas que sobran */
-        if (s.perso) for (var ri = SAUCES.length - 1; ri >= 0 && alasTot(s.alas) > p.piezas[s.opt]; ri--) {
-          var rs = SAUCES[ri]; if (!s.alas[rs]) continue;
+        /* primero se quitan las de receta secreta (son las de relleno), luego las últimas */
+        var orden = [SAUCES[0]].concat(SAUCES.slice(1).reverse());
+        if (s.perso) for (var ri = 0; ri < orden.length && alasTot(s.alas) > p.piezas[s.opt]; ri++) {
+          var rs = orden[ri]; if (!s.alas[rs]) continue;
           s.alas[rs] -= Math.min(s.alas[rs], alasTot(s.alas) - p.piezas[s.opt]); if (!s.alas[rs]) delete s.alas[rs];
         }
+        /* si sube la porción (de 5 a 10), las que faltan se completan con receta secreta */
+        if (s.perso && alasTot(s.alas) < p.piezas[s.opt]) s.alas[SAUCES[0]] = (s.alas[SAUCES[0]] || 0) + p.piezas[s.opt] - alasTot(s.alas);
         return renderLayer();
       }
       /* contador de alitas: personalizadas o una parte de combo (data-cparte) */
       if ((el = find(t, "[data-cala]"))) {
         var cp = attr(el, "data-cparte"), ca = cp === null ? s.alas : s.comps[Number(cp)].alas;
         var cn = cp === null ? p.piezas[s.opt] : piezasParte(p.parts[Number(cp)]), cs = attr(el, "data-cala"), cd = Number(attr(el, "data-cd"));
-        if (cd > 0 && alasTot(ca) >= cn) return;
+        /* llena: la nueva sale de las de receta secreta; si ya no hay de esas, no se puede sumar */
+        if (cd > 0 && alasTot(ca) >= cn) {
+          if (cs === SAUCES[0] || !ca[SAUCES[0]]) return;
+          ca[SAUCES[0]]--; if (!ca[SAUCES[0]]) delete ca[SAUCES[0]];
+        }
         ca[cs] = Math.max(0, (ca[cs] || 0) + cd); if (!ca[cs]) delete ca[cs];
         return renderLayer();
       }

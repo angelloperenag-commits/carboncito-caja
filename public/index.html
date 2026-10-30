@@ -1094,16 +1094,22 @@ function alasText(a, n) {
   if (e.length === 1 && t === n) return e[0].plain ? e[0].name : "Salsa " + e[0].name;
   return e.map(s => a[s.id] + " " + s.name).join(", ") + (t < n ? ` (faltan ${n - t})` : "");
 }
+/* al cambiar de porción: si sobran se quitan las últimas; si faltan, se completan con receta secreta */
+function completarAlas(a, n) { recortarAlas(a, n); const f = n - alasTotal(a); if (f > 0) a[SAUCES[0].id] = (a[SAUCES[0].id] || 0) + f; }
 /* si baja la orden (de 10 a 5), se quitan las últimas que sobran */
 function recortarAlas(a, n) {
-  for (let i = SAUCES.length - 1; i >= 0 && alasTotal(a) > n; i--) {
+  /* primero se quitan las de receta secreta (son las de relleno), luego las últimas */
+  const orden = [SAUCES[0], ...SAUCES.slice(1).reverse()];
+  for (let j = 0; j < orden.length && alasTotal(a) > n; j++) {
+    const i = SAUCES.indexOf(orden[j]);
     const id = SAUCES[i].id; if (!a[id]) continue;
     a[id] -= Math.min(a[id], alasTotal(a) - n); if (!a[id]) delete a[id];
   }
 }
 const baseSauces = p => p.sauces ? [SAUCES[0].id] : [];
 /* lo elegido en cada parte de un combo: { sauces, off, alas }. Las alitas y las partes de un solo sabor empiezan sin elegir. */
-const basePart = c => { const r = partProd(c), alas = r && r.sauces && !c.unSabor; return { sauces: [], off: [], opcion: "", alas: alas ? {} : null }; };
+/* lo elegido en cada parte de un combo: { sauces, off, alas }. Las alitas empiezan todas con la receta secreta; las partes de un solo sabor, sin elegir. */
+const basePart = c => { const r = partProd(c), alas = r && r.sauces && !c.unSabor; return { sauces: [], off: [], opcion: "", alas: alas ? { [SAUCES[0].id]: piezasParte(c) } : null }; };
 /* para el icono de la lista: todo ya elegido con la receta secreta */
 const baseSel = p => ({ opt: p.combo ? 1 : 0, off: [], sauces: baseSauces(p), alas: p.sauces ? { [SAUCES[0].id]: alasMax(p, 0) } : null,
   comp: p.parts ? p.parts.map(c => { const b = basePart(c); if (b.alas) b.alas[SAUCES[0].id] = piezasParte(c); return b; }) : [] });
@@ -1257,10 +1263,10 @@ function redibujarAlas(parte) {
 }
 /* contador de alitas por sabor; parte = índice de la parte del combo, o "" en las alitas solas */
 function alasHTML(a, n, parte) {
-  const t = alasTotal(a), at = parte === "" ? "" : ` data-apart="${parte}"`;
+  const t = alasTotal(a), at = parte === "" ? "" : ` data-apart="${parte}"`, base = SAUCES[0].id;
   return `<div class="alas-box" data-box="${parte}"><p class="mini">Elige el sabor de cada alita. Llevas <b>${t} de ${n}</b>${t === n ? " ✓" : ""}.</p>
     <div class="alas">${SAUCES.map(s => `<div class="ala-row"><i style="background:${s.tone}"></i><span>${esc(s.name)}</span>
-      <div class="stepper sm"><button type="button"${at} data-ala="${s.id}" data-ad="-1" aria-label="Una alita menos de ${esc(s.name)}"${a[s.id] ? "" : " disabled"}>−</button><output>${a[s.id] || 0}</output><button type="button"${at} data-ala="${s.id}" data-ad="1" aria-label="Una alita más de ${esc(s.name)}"${t < n ? "" : " disabled"}>+</button></div></div>`).join("")}</div></div>`;
+      <div class="stepper sm"><button type="button"${at} data-ala="${s.id}" data-ad="-1" aria-label="Una alita menos de ${esc(s.name)}"${a[s.id] ? "" : " disabled"}>−</button><output>${a[s.id] || 0}</output><button type="button"${at} data-ala="${s.id}" data-ad="1" aria-label="Una alita más de ${esc(s.name)}"${t < n || (s.id !== base && a[base]) ? "" : " disabled"}>+</button></div></div>`).join("")}</div></div>`;
 }
 
 /* ---------- ficha del producto ---------- */
@@ -1631,7 +1637,7 @@ function fillSheet(isCart, p, preset) {
   if (isCart) { current = null; sheet.innerHTML = cartHTML(); }
   else {
     current = p;
-    sel = Object.assign({ opt: 0, sauces: baseSauces(p), off: [], alas: {}, comp: p.parts ? p.parts.map(basePart) : [], qty: 1, editKey: null }, preset || {});
+    sel = Object.assign({ opt: 0, sauces: baseSauces(p), off: [], alas: p.sauces ? { [SAUCES[0].id]: alasMax(p, 0) } : {}, comp: p.parts ? p.parts.map(basePart) : [], qty: 1, editKey: null }, preset || {});
     sel.sauces = [...sel.sauces]; sel.off = [...sel.off];
     sheet.innerHTML = sheetHTML(p);
   }
@@ -1681,7 +1687,7 @@ document.addEventListener("click", e => {
       sel.opt = +o.dataset.opt;
       setPressed("[data-opt]", b => { const on = b === o; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
       /* alitas: si cambia la porción, el contador se ajusta al nuevo máximo */
-      if (current.sauces) { recortarAlas(sel.alas, alasMax(current, sel.opt)); redibujarAlas(""); }
+      if (current.sauces) { completarAlas(sel.alas, alasMax(current, sel.opt)); redibujarAlas(""); }
       return updateProduct(true);
     }
     /* contador de alitas por sabor (alitas solas o una parte de combo) */
@@ -1691,7 +1697,12 @@ document.addEventListener("click", e => {
       const a = parte === "" ? sel.alas : sel.comp[parte].alas;
       const n = parte === "" ? alasMax(current, sel.opt) : piezasParte(current.parts[parte]);
       const id = ab.dataset.ala, d = +ab.dataset.ad;
-      if (d > 0 && alasTotal(a) >= n) return;
+      /* llena: la nueva sale de las de receta secreta; si ya no hay de esas, no se puede sumar */
+      if (d > 0 && alasTotal(a) >= n) {
+        const base = SAUCES[0].id;
+        if (id === base || !a[base]) return;
+        a[base]--; if (!a[base]) delete a[base];
+      }
       a[id] = Math.max(0, (a[id] || 0) + d); if (!a[id]) delete a[id];
       redibujarAlas(parte);
       const er = document.getElementById(parte === "" ? "sauce-err" : "part-err"); if (er) er.hidden = true;

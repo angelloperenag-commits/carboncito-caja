@@ -71,8 +71,7 @@
     { id: "jarritos-manzana", cat: "drinks", name: "Jarritos Manzana", desc: "Refresco de 600 ml", img: "jarritos-manzana-600ml", opts: [["600 ml", 25]], quitar: [] },
     { id: "jarritos-limon", cat: "drinks", name: "Jarritos Limón", desc: "Refresco de 600 ml", img: "jarritos-limon-600ml", opts: [["600 ml", 25]], quitar: [] },
     { id: "jarritos-tamarindo", cat: "drinks", name: "Jarritos Tamarindo", desc: "Refresco de 600 ml", img: "jarritos-tamarindo-600ml", opts: [["600 ml", 25]], quitar: [] },
-    /* falta confirmar el precio: se ve como borrador y no se vende */
-    { id: "coca-cola", cat: "drinks", name: "Coca-Cola de vidrio", desc: "500 ml", img: "coca-cola-vidrio-500ml", opts: [["500 ml", null]], quitar: [] },
+    { id: "coca-cola", cat: "drinks", name: "Coca-Cola de vidrio", desc: "Refresco de 500 ml", img: "coca-cola-vidrio-500ml", opts: [["500 ml", 25]], quitar: [] },
     { id: "cerveza", cat: "drinks", name: "Cerveza", desc: "Solo en el local", img: "cerveza-tarro-espuma", opts: [["Cerveza", 35]], quitar: [] }
   ];
   /* Bebidas se queda aunque esté vacía, para que se vea dónde van a ir */

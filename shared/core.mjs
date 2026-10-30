@@ -64,8 +64,7 @@ export const CATALOG = {
   "jarritos-manzana": bebida("Jarritos Manzana", [["600 ml", 25]]),
   "jarritos-limon": bebida("Jarritos Limón", [["600 ml", 25]]),
   "jarritos-tamarindo": bebida("Jarritos Tamarindo", [["600 ml", 25]]),
-  /* falta confirmar el precio: mientras sea null no se vende */
-  "coca-cola": bebida("Coca-Cola de vidrio", [["500 ml", null]]),
+  "coca-cola": bebida("Coca-Cola de vidrio", [["500 ml", 25]]),
 };
 /* se puede vender: no es borrador, está disponible y todas sus opciones tienen precio */
 export const sellable = (p) => !!p && !p.draft && p.disponible !== false && p.opts.every((o) => typeof o[1] === "number");

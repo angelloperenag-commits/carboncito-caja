@@ -314,6 +314,8 @@ button.prow:focus-visible, button.chip:focus-visible, .stepper button:focus-visi
 .stepper.sm button { font-size: 18px; }
 .stepper.sm output { font-size: 15px; }
 .btn.add { min-height: 50px; background: var(--orange); border-color: var(--orange); color: #fff8ee; font-size: 16px; font-weight: 700; box-shadow: 0 3px 0 #a84a12; }
+.btn.add[disabled] { opacity: .45; box-shadow: none; cursor: not-allowed; }
+.add-hint { margin: 10px 0 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--terra); }
 
 /* ---------- constructor visual ---------- */
 .fb {
@@ -756,7 +758,7 @@ const ING = {
   /* salchipulpos y papas */
   sp_papas:  { name: "Papas", file: "sp-papas.webp", ar: .46, tone: "#e9b43c" },
   salchipulpo: { name: "Salchipulpos", file: "salchipulpos-4.webp", ar: .65, tone: "#c8502c" },
-  /* salsas en potes negros al fondo de la canasta */
+  /* salsas en potes negros al fondo de la canasta (salchipulpos); en la orden de papas van chorreadas (CHORRO) */
   sp_queso:  { name: "Queso de nachos", file: "queso-nachos-bote.webp", at: { x: 22, y: 31, w: 24 }, ar: .81, tone: "#f4a91c" },
   sp_catsup: { name: "Catsup", file: "catsup-bote.webp", at: { x: 50, y: 33, w: 24 }, ar: .81, tone: "#b81d12" },
   sp_valentina: { name: "Valentina", file: "valentina-bote.webp", at: { x: 78, y: 31, w: 24 }, ar: .81, tone: "#8a1a0a" },
@@ -940,7 +942,7 @@ function filesOf(p) {
   if (p.builder === "burger") f.push(ING.pan_inf.file, ING.pan_sup.file, ING.papas_combo.file);
   if (p.builder === "hotdog") f.push(ING.hd_pan_atras.file);
   if (p.builder === "wings") f.push("canasta.webp", "canasta-frente.webp", ...SAUCES.map(s => `alitas-${s.id}-1.webp`));
-  if (p.builder === "loaded") f.push("canasta.webp", "canasta-frente.webp", "salchipulpos-6.webp");
+  if (p.builder === "loaded") f.push("canasta.webp", "canasta-frente.webp", "salchipulpos-6.webp", ...(p.pulpos ? [] : Object.values(CHORRO).map(c => c.file)));
   if (p.builder === "drink") f.push(p.file);
   /* combo: las fotos de cada parte (y de los refrescos que se pueden elegir) */
   if (p.parts) p.parts.forEach(c => {
@@ -963,6 +965,12 @@ function basket(L, lettuce) {
   L.push({ key: "frente", ing: "canasta_frente", file: lettuce ? "canasta-lechuga-frente.webp" : "canasta-frente.webp", x: 50, y: 2, w: 96, z: 90, enter: "drop", order: 0 });
 }
 /* dónde cae cada alita dentro de la canasta: [x, altura, giro]. Van de atrás hacia adelante, así las de enfrente quedan encima. */
+/* salsas chorreadas sobre la orden de papas (fotos y lugares de antes de los potes) */
+const CHORRO = {
+  sp_queso: { file: "sp-queso-nachos.webp", x: 50, y: 22, w: 44, sy: .55 },
+  sp_catsup: { file: "sp-catsup.webp", x: 44, y: 25, w: 40, sy: .55 },
+  sp_valentina: { file: "sp-valentina.webp", x: 57, y: 24, w: 40, sy: .5 },
+};
 const WING_SPOTS_10 = [[24, 25, -12], [41, 26, 8], [58, 25, -6], [75, 24, 14], [30, 18, 10], [50, 19, -14], [70, 18, 6], [33, 11, -8], [51, 12, 12], [68, 11, -4]];
 const WING_SPOTS_5 = [[38, 23, -10], [61, 23, 12], [27, 14, 8], [50, 15, -12], [73, 14, 6]];
 const COMPOSE = {
@@ -1020,18 +1028,19 @@ const COMPOSE = {
     return { H, L, fit: 1, shadow: { x: 50, w: 94 } };
   },
 
-  /* canasta con las salsas en potes al fondo, las papas y los pulpos encima (si lleva) */
+  /* salchipulpos: las salsas en potes al fondo y los pulpos sobre las papas.
+     Orden de papas: las salsas chorreadas encima, como siempre. */
   loaded(p, s) {
-    const H = 62, big = s.opt === 1, L = [];
+    const H = 62, big = s.opt === 1, L = [], salsas = ["sp_queso", "sp_catsup", "sp_valentina"].filter(id => p.recipe.includes(id) && !isOff(s, id));
     basket(L, false);
-    ["sp_queso", "sp_catsup", "sp_valentina"].forEach((id, i) => {
-      if (!p.recipe.includes(id) || isOff(s, id)) return; const a = ING[id].at;
-      L.push({ key: id, ing: id, x: a.x, y: a.y, w: a.w, z: 2 + i, enter: "drop", order: 1 + i });
-    });
-    L.push({ key: "papas", ing: "sp_papas", x: 50, y: 10, w: big ? 70 : 60, z: 10, enter: "drop", order: 4 });
     if (p.pulpos) {
       const six = p.pulpos[s.opt] === 6;
+      salsas.forEach((id, i) => { const a = ING[id].at; L.push({ key: id, ing: id, x: a.x, y: a.y, w: a.w, z: 2 + i, enter: "drop", order: 1 + i }); });
+      L.push({ key: "papas", ing: "sp_papas", x: 50, y: 10, w: big ? 70 : 60, z: 10, enter: "drop", order: 4 });
       L.push({ key: "pulpos", ing: "salchipulpo", file: six ? "salchipulpos-6.webp" : "salchipulpos-4.webp", x: 50, y: 12, w: six ? 62 : 52, z: 11, enter: "pop", order: 5 });
+    } else {
+      L.push({ key: "papas", ing: "sp_papas", x: 50, y: 12, w: big ? 72 : 62, z: 2, enter: "drop", order: 1 });
+      salsas.forEach((id, i) => { const c = CHORRO[id]; L.push({ key: id + "-chorro", ing: id, file: c.file, x: c.x, y: c.y, w: c.w, sy: c.sy, z: 4 + i, enter: "wipe", order: 3 + i }); });
     }
     return { H, L, fit: 1, shadow: { x: 50, w: 94 } };
   },
@@ -1323,6 +1332,7 @@ function sheetHTML(p) {
     <p class="sum" id="fb-sum" aria-live="polite"></p>
     ${opts}${sauces}${parts}${ings}
     <div class="psum" id="psum"></div>
+    <p class="add-hint" id="add-hint" hidden></p>
     <div class="addrow">
       <div class="stepper" aria-label="Cantidad">
         <button type="button" data-qty="-1" aria-label="Quitar uno">−</button>
@@ -1332,12 +1342,26 @@ function sheetHTML(p) {
       <button type="button" class="btn add" id="add">${sel.editKey ? "Guardar" : "Agregar"} <span id="add-total"></span></button>
     </div>`;
 }
+/* lo que falta elegir antes de poder agregar ("" si ya está todo) */
+function faltaElegir(p, s) {
+  if (p.sauces && alasTotal(s.alas) !== alasMax(p, s.opt)) return `Falta elegir el sabor de ${alasMax(p, s.opt) - alasTotal(s.alas)} alitas.`;
+  for (const [i, c] of (p.parts || []).entries()) {
+    const ps = s.comp[i];
+    if (c.opciones && !ps.opcion) return `Falta elegir: ${c.label.toLowerCase()}.`;
+    if (c.unSabor && !sauceById(ps.sauces[0])) return `Falta elegir el sabor de: ${c.label.toLowerCase()}.`;
+    if (ps.alas && alasTotal(ps.alas) !== piezasParte(c)) return `Falta elegir el sabor de las alitas de: ${c.label.toLowerCase()}.`;
+  }
+  return "";
+}
 function updateProduct(animate) {
   const p = current, base = p.prices[sel.opt][1];
   const extras = sel.off.reduce((a, id) => a, 0); /* quitar no cuesta; aquí sumarían extras con precio */
   const unit = base + extras;
   document.getElementById("qty").textContent = sel.qty;
   document.getElementById("add-total").textContent = "· " + money(unit * sel.qty);
+  /* el botón se bloquea hasta que esté todo elegido, y abajo dice qué falta */
+  const falta = faltaElegir(p, sel), hint = document.getElementById("add-hint");
+  document.getElementById("add").disabled = !!falta; hint.textContent = falta; hint.hidden = !falta;
   const parts = custParts(p, sel);
   document.getElementById("fb-sum").textContent = parts.length ? parts.join(" · ") : "Como viene";
   document.getElementById("psum").innerHTML =

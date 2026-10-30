@@ -612,12 +612,23 @@
       return '<div class="part">' + h + "</div>";
     }).join("");
   }
+  /* lo que falta elegir antes de poder agregar ("" si ya está todo) */
+  function faltaCaja(p, s) {
+    if (s.perso && alasTot(s.alas) !== p.piezas[s.opt]) return "Falta elegir el sabor de " + (p.piezas[s.opt] - alasTot(s.alas)) + " alitas";
+    for (var i = 0; p.parts && i < p.parts.length; i++) {
+      var c = p.parts[i], ps = s.comps[i];
+      if (c.opciones && !ps.opcion) return "Falta elegir: " + c.label.toLowerCase();
+      if (c.unSabor && !ps.sauces.length) return "Falta elegir el sabor de: " + c.label.toLowerCase();
+      if (ps.alas && alasTot(ps.alas) !== piezasParte(c)) return "Falta elegir el sabor de las alitas de: " + c.label.toLowerCase();
+    }
+    return "";
+  }
   function pickHTML() {
-    var s = state.pick, p = prod(s.pid), venta = sellable(p);
+    var s = state.pick, p = prod(s.pid), venta = sellable(p), falta = faltaCaja(p, s);
     if (p.parts) {
       var foot = venta
         ? '<div class="m-foot"><div class="step"><button type="button" data-pq="-1">−</button><output>' + s.qty + '</output><button type="button" data-pq="1">+</button></div>' +
-          '<button type="button" class="btn" data-act="add-line">Agregar</button></div>'
+          '<button type="button" class="btn" data-act="add-line"' + (falta ? ' disabled' : '') + '>Agregar</button></div>' + (falta ? '<p class="add-hint">' + esc(falta) + '</p>' : '')
         : '<div class="m-foot"><button type="button" class="btn" disabled>Borrador: todavía no se vende</button></div>';
       return '<div class="overlay"><div class="modal">' +
         '<div class="m-head">' + imgOf(p) + "<h2>" + esc(p.name) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
@@ -648,7 +659,7 @@
       '<div class="m-body">' + (p.desc ? '<p class="note">' + esc(p.desc) + "</p>" : "") +
       (venta ? "" : '<div class="confirm"><p><b>Todavía no se vende:</b> ' + pendientes(p).map(esc).join(", ") + "</p></div>") + opts + tocino + sauces + quitar + "</div>" +
       (venta ? '<div class="m-foot"><div class="step"><button type="button" data-pq="-1">−</button><output>' + s.qty + '</output><button type="button" data-pq="1">+</button></div>' +
-        '<button type="button" class="btn" data-act="add-line">Agregar</button></div>'
+        '<button type="button" class="btn" data-act="add-line"' + (falta ? ' disabled' : '') + '>Agregar</button></div>' + (falta ? '<p class="add-hint">' + esc(falta) + '</p>' : '')
         : '<div class="m-foot"><button type="button" class="btn" disabled>Todavía no se vende</button></div>') + "</div></div>";
   }
 

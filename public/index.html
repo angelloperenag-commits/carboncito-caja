@@ -727,8 +727,8 @@ const ING = {
   hd_cebolla: { name: "Cebolla", file: "hd-cebolla.webp", sy: .8, at: { x: 51, y: 25, w: 62 }, ar: .32, tone: "#e9dcec" },
   hd_catsup: { name: "Catsup", file: "hd-catsup.webp", sy: .7, at: { x: 49, y: 24, w: 70 }, ar: .31, tone: "#b81d12", wipe: true },
   hd_mostaza: { name: "Mostaza", file: "hd-mostaza.webp", sy: .7, at: { x: 52, y: 26, w: 66 }, ar: .31, tone: "#e6b41a", wipe: true },
-  /* sin foto todavía: se puede quitar, pero no se dibuja en el hotdog (noLayer) */
-  hd_chile: { name: "Chiles", tone: "#7c9a2c", noLayer: true },
+  /* chiles en vinagre a lo largo del hotdog */
+  hd_chile: { name: "Chiles", file: "hd-chile-vinagre.webp", sy: .8, at: { x: 50, y: 24, w: 60 }, ar: .36, tone: "#7c9a2c" },
 
   /* canasta universal: fondo y pared frontal por separado, para que la comida quede dentro */
   canasta:        { name: "Canasta", file: "canasta.webp", ar: .53, tone: "#1a1716" },
@@ -742,6 +742,8 @@ const ING = {
   ranch:     { name: "Salsa ranch", file: "ranch-bote.webp", at: { x: 79, y: 31, w: 17 }, ar: .8, tone: "#f4f1e6" },
   alitas:    { name: "Alitas", ar: .43, tone: "#8a5a3c" },
   alitas_ghost: { name: "Alitas", ar: .43, tone: "#6b5246", ghost: true },
+  /* una alita: la foto la pone cada capa (alitas-<sabor>-1.webp) */
+  ala: { name: "Alita", ar: .66, tone: "#a8642e" },
 
   /* salchipulpos y papas */
   sp_papas:  { name: "Papas", file: "sp-papas.webp", ar: .46, tone: "#e9b43c" },
@@ -788,6 +790,11 @@ const burger = (id, name, desc, meats, price, extra) => Object.assign({
 /* parte de un combo y combo. Un combo queda en borrador (no se vende) mientras le falte el precio,
    una parte tenga algo por confirmar (pend) o falte decidir si se repiten sabores (repetidos: null). */
 const part = (pid, label, extra) => Object.assign({ pid, label }, extra);
+/* bebida con su foto y una fila de precio por presentación */
+const bebida = (id, name, file, prices, extra) => Object.assign({ id, name, icon: "i-wings", builder: "drink", file, prices, recipe: [], fixed: [],
+  desc: "Refresco de " + prices.map(r => r[0]).join(" o "), lead: name + ", " + prices.map(r => r[0]).join(" o ") + ".", disponible: true }, extra);
+/* refrescos de 600 ml que se pueden elegir en un combo */
+const JARRITOS = ["jarritos-uva", "jarritos-pina", "jarritos-manzana", "jarritos-limon", "jarritos-tamarindo"];
 const combo = (id, name, desc, price, parts, extra) => {
   const c = Object.assign({ id, name, icon: "i-wings", builder: "combo", desc, lead: desc + ".", parts, recipe: [], fixed: [], prices: [["Combo", price]] }, extra);
   c.draft = price == null || parts.some(x => x.pend) || (parts.some(x => x.unSabor) && typeof c.repetidos !== "boolean");
@@ -832,35 +839,43 @@ const MENU = {
      pend: dato que falta confirmar. Con draft: true el combo no aparece en el menú ni se puede pedir.
      Mismo id y mismas partes en shared/core.mjs y en la caja. */
   combos: [
-    combo("combo-carboncito", "CARBONCITO", "Hamburguesa sencilla, papas, 4 alitas y refresco de 600 ml", 100, [
-      part("sencilla", "Hamburguesa sencilla"),
-      part("papas", "Papas", { pend: "Falta confirmar la porción" }),
+    combo("combo-carboncito", "CARBONCITO", "Hamburguesa sencilla con papas, 4 alitas y refresco de 600 ml", 100, [
+      part("sencilla", "Hamburguesa sencilla con papas"),
       part("alitas", "4 alitas"),
-      part(null, "Refresco de 600 ml", { pend: "Falta confirmar marca y sabor" }),
-    ]),
-    combo("combo-rico", "Combo rico", "Hamburguesa hawaiana, alitas, salchipulpos chicos y hot dog", 200, [
-      part("hawaiana", "Hamburguesa hawaiana", { pend: "Falta confirmar si lleva sus papas" }),
-      part("alitas", "Alitas", { pend: "Falta confirmar si es orden completa y cuántas piezas" }),
+      part(null, "Refresco de 600 ml", { opciones: JARRITOS }),
+    ], { file: "combo-carboncito.webp" }),
+    combo("combo-rico", "Combo rico", "Hamburguesa hawaiana, alitas (orden de 10), salchipulpos chicos y 3 hot dogs sencillos", 200, [
+      part("hawaiana", "Hamburguesa hawaiana (sin papas)"),
+      part("alitas", "Alitas (orden de 10)"),
       part("salchipulpos", "Salchipulpos chicos (4 pulpos)"),
-      part("hotdog", "Orden de hot dog", { pend: "Falta confirmar cuántos hot dogs y de cuáles" }),
-    ]),
-    combo("combo-domi", "Domi combo", "2 hamburguesas hawaianas, alitas, salchipulpos grandes y hot dogs sencillos", 300, [
-      part("hawaiana", "Hamburguesa hawaiana 1", { pend: "Falta confirmar si lleva sus papas" }),
-      part("hawaiana", "Hamburguesa hawaiana 2", { pend: "Falta confirmar si lleva sus papas" }),
-      part("alitas", "Alitas", { pend: "Falta confirmar si es orden completa y cuántas piezas" }),
+      part("hotdog", "Hot dogs sencillos (orden de 3)"),
+    ], { file: "combo-rico.webp" }),
+    combo("combo-domi", "Domi combo", "2 hamburguesas hawaianas, alitas (orden de 10), salchipulpos grandes y 3 hot dogs sencillos", 300, [
+      part("hawaiana", "Hamburguesa hawaiana 1 (sin papas)"),
+      part("hawaiana", "Hamburguesa hawaiana 2 (sin papas)"),
+      part("alitas", "Alitas (orden de 10)"),
       part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
-      part("hotdog", "Orden de hot dogs sencillos", { pend: "Falta confirmar cuántos hot dogs" }),
-    ]),
-    combo("medio-alicombo", "1/2 Alicombo", "Tres medias órdenes de alitas, un sabor en cada una", null, [
+      part("hotdog", "Hot dogs sencillos (orden de 3)"),
+    ], { file: "domi-combo.webp" }),
+    combo("medio-alicombo", "1/2 Alicombo", "Tres medias órdenes de alitas, un sabor en cada una", 150, [
       part("alitas", "Media orden 1", { unSabor: true }),
       part("alitas", "Media orden 2", { unSabor: true }),
       part("alitas", "Media orden 3", { unSabor: true }),
-    ], { repetidos: null, pendiente: "Falta confirmar el precio y si se pueden repetir sabores" }),
+    ], { repetidos: true, file: "medio-alicombo.webp" }),
   ],
   /* bebidas: { id, name, desc, lead, file (foto WebP en img/; sin foto se ve un marcador con el nombre),
      prices: [["600 ml", 25], ...] (una fila por presentación), disponible: true/false, builder: "drink", recipe: [], fixed: [] }.
      Mismo id en shared/core.mjs y en la caja. La sección aparece sola cuando hay alguna disponible con precio. */
-  drinks: [],
+  drinks: [
+    bebida("jarritos-uva", "Jarritos Uva", "jarritos-uva-600ml.webp", [["600 ml", 25]]),
+    bebida("jarritos-pina", "Jarritos Piña", "jarritos-pina-600ml.webp", [["600 ml", 25]]),
+    bebida("jarritos-manzana", "Jarritos Manzana", "jarritos-manzana-600ml.webp", [["600 ml", 25]]),
+    bebida("jarritos-limon", "Jarritos Limón", "jarritos-limon-600ml.webp", [["600 ml", 25]]),
+    bebida("jarritos-tamarindo", "Jarritos Tamarindo", "jarritos-tamarindo-600ml.webp", [["600 ml", 25]]),
+    /* falta confirmar el precio: con null no se muestra ni se vende */
+    bebida("coca-cola", "Coca-Cola de vidrio", "coca-cola-vidrio-500ml.webp", [["500 ml", null]]),
+    /* la cerveza es solo de la caja: no va aquí */
+  ],
 };
 const ARTIFACT_URL = location.origin + "/";
 const WA = "527771138935";
@@ -914,7 +929,7 @@ function filesOf(p) {
   const f = p.recipe.map(id => ING[id].file);
   if (p.builder === "burger") f.push(ING.pan_inf.file, ING.pan_sup.file, ING.papas_combo.file);
   if (p.builder === "hotdog") f.push(ING.hd_pan_atras.file);
-  if (p.builder === "wings") f.push("canasta.webp", "canasta-frente.webp", "canasta-lechuga-frente.webp", ...SAUCES.map(s => s.file));
+  if (p.builder === "wings") f.push("canasta.webp", "canasta-frente.webp", ...SAUCES.map(s => `alitas-${s.id}-1.webp`));
   if (p.builder === "loaded") f.push("canasta.webp", "canasta-frente.webp", "salchipulpos-6.webp");
   if (p.builder === "drink" || p.builder === "combo") f.push(p.file);
   return uniq(f.filter(Boolean));
@@ -932,6 +947,9 @@ function basket(L, lettuce) {
   L.push({ key: "canasta", ing: lettuce ? "alitas_lechuga" : "canasta", x: 50, y: 2, w: 96, z: 1, enter: "drop", order: 0 });
   L.push({ key: "frente", ing: "canasta_frente", file: lettuce ? "canasta-lechuga-frente.webp" : "canasta-frente.webp", x: 50, y: 2, w: 96, z: 90, enter: "drop", order: 0 });
 }
+/* dónde cae cada alita dentro de la canasta: [x, altura, giro]. Van de atrás hacia adelante, así las de enfrente quedan encima. */
+const WING_SPOTS_10 = [[24, 25, -12], [41, 26, 8], [58, 25, -6], [75, 24, 14], [30, 18, 10], [50, 19, -14], [70, 18, 6], [33, 11, -8], [51, 12, 12], [68, 11, -4]];
+const WING_SPOTS_5 = [[38, 23, -10], [61, 23, 12], [27, 14, 8], [50, 15, -12], [73, 14, 6]];
 const COMPOSE = {
   /* torre: cada capa se apoya en la de abajo según su grosor */
   burger(p, s) {
@@ -965,18 +983,18 @@ const COMPOSE = {
     return { H, L, fit: 1, shadow: { x: 50, w: n === 3 ? 92 : 82 } };
   },
 
-  /* canasta con el ranch atrás y las alitas al frente (mitad y mitad si hay dos salsas) */
+  /* canasta con el ranch atrás y las alitas cayendo una por una (10 la orden, 5 la media).
+     Mitad y mitad: se alternan los dos sabores. Combo mixto: 2 de cada salsa (1 en el medio combo). */
   wings(p, s) {
     const H = 62, L = [];
     basket(L, false);
     if (!isOff(s, "ranch")) { const a = ING.ranch.at; L.push({ key: "ranch", ing: "ranch", x: a.x, y: a.y, w: a.w, z: 33, enter: "drop", order: 5 }); }
-    const sa = (p.mix ? ["mango-habanero", "tamarindo-picante"] : s.sauces).map(sauceById);
-    if (!sa.length) L.push({ key: "pila0", ing: "alitas_ghost", file: null, label: "Elige tu salsa", x: 50, y: 14, w: 66, z: 40, enter: "drop", order: 6 });
-    else [[33, 14, 0], [67, 13, 1]].forEach(([x, y, i]) => {
-      const sc = sa[i] || sa[0];
-      L.push(sc.file
-        ? { key: "pila" + i, ing: "alitas", file: sc.file, x, y, w: 52, z: 40 + i, enter: "drop", order: 6 + i }
-        : { key: "pila" + i, ing: "alitas_ghost", file: null, label: sc.name + ": foto pendiente", x, y, w: 50, z: 40 + i, enter: "drop", order: 6 + i });
+    const media = s.opt === 1, spots = media ? WING_SPOTS_5 : WING_SPOTS_10;
+    const ids = p.mix ? SAUCES.filter(x => !x.plain).map(x => x.id) : s.sauces.length ? s.sauces : [SAUCES[0].id];
+    spots.forEach(([x, y, rot], i) => {
+      const id = ids[i % ids.length];
+      /* la clave lleva el sabor: si cambia, esa alita cae de nuevo con el sabor nuevo */
+      L.push({ key: "ala" + i + id, ing: "ala", file: `alitas-${id}-1.webp`, x, y, w: media ? 30 : 27, rot, z: 40 + i, enter: "drop", order: 6 + i, seq: i + 1 });
     });
     return { H, L, fit: 1, shadow: { x: 50, w: 94 } };
   },
@@ -1014,14 +1032,14 @@ const COMPOSE = {
 const partProd = c => c.pid ? ALL.find(x => x.id === c.pid) : null;
 const baseSauces = p => p.sauces ? [SAUCES[0].id] : [];
 /* lo elegido en cada parte de un combo: { sauces, off }. Una parte de un solo sabor empieza sin elegir. */
-const basePart = c => { const r = partProd(c); return { sauces: r && r.sauces && !c.unSabor ? [SAUCES[0].id] : [], off: [] }; };
+const basePart = c => { const r = partProd(c); return { sauces: r && r.sauces && !c.unSabor ? [SAUCES[0].id] : [], off: [], opcion: "" }; };
 const baseSel = p => ({ opt: p.combo ? 1 : 0, off: [], sauces: baseSauces(p), comp: p.parts ? p.parts.map(basePart) : [] });
 function miniHTML(p) {
   const c = COMPOSE[p.builder](p, baseSel(p));
   if (!c.L.every(d => { const st = IMG[fileOf(d)]; return st && st.st === "ok"; })) return null;
   return `<span class="armada" style="aspect-ratio:100/${c.H}"><span class="mg" style="transform:scale(${c.fit.toFixed(3)})">${c.L.map(d => {
     const f = fileOf(d), ar = arOf(f, ING[d.ing].ar) * (d.sy || 1);
-    return `<img src="${IMG_BASE + f}" alt="" style="left:${d.x}%;bottom:${(d.y * 100 / c.H).toFixed(2)}%;width:${d.w}%;aspect-ratio:${(1 / ar).toFixed(4)};z-index:${d.z}">`;
+    return `<img src="${IMG_BASE + f}" alt="" style="left:${d.x}%;bottom:${(d.y * 100 / c.H).toFixed(2)}%;width:${d.w}%;aspect-ratio:${(1 / ar).toFixed(4)};z-index:${d.z}${d.rot ? `;transform:translateX(-50%) rotate(${d.rot}deg)` : ""}">`;
   }).join("")}</span></span>`;
 }
 function refreshMinis() {
@@ -1097,7 +1115,7 @@ function fbRender(animate) {
     if (fresh) { el = document.createElement("div"); el.className = "lyr"; fb.group.appendChild(el); fb.els.set(d.key, el); }
     const ar = arOf(file, g.ar) * (d.sy || 1);
     const look = d.ing + "|" + (file || "") + "|" + (IMG[file] ? IMG[file].st : "") + "|" + (d.label || "");
-    const tf = `translate(${(d.x * px).toFixed(1)}px, ${(-d.y * px).toFixed(1)}px) translateX(-50%)`;
+    const tf = `translate(${(d.x * px).toFixed(1)}px, ${(-d.y * px).toFixed(1)}px) translateX(-50%)` + (d.rot ? ` rotate(${d.rot}deg)` : "");
     const tf0 = el._tf, w0 = el._w;
     el.style.width = d.w + "%";
     el.style.aspectRatio = (1 / ar).toFixed(4);
@@ -1105,7 +1123,8 @@ function fbRender(animate) {
     el.style.clipPath = g.clip || "";
     el.style.transform = tf; el._tf = tf; el._w = d.w;
     if (el.dataset.look !== look) { swapFace(el, faceHTML(g, file, d), !fresh && animate); el.dataset.look = look; }
-    if (fresh) { if (animate) enterAnim(el, d, tf, fb.opening ? 140 + d.order * 75 : 60); }
+    /* seq: van cayendo una tras otra también al cambiar algo (las alitas) */
+    if (fresh) { if (animate) enterAnim(el, d, tf, fb.opening ? 140 + d.order * 75 : d.seq ? 40 + d.seq * 70 : 60); }
     else if (animate && !reduce && el.animate && (tf0 !== tf || w0 !== d.w)) moveAnim(el, tf0, w0 / d.w, tf);
   });
   fb.els.forEach((el, k) => { if (!seen.has(k)) { fb.els.delete(k); exitAnim(el); } });
@@ -1145,6 +1164,7 @@ const sinText = off => off.length ? "sin " + joinY(off.map(id => ING[id].name.to
 function partText(c, ps) {
   const r = partProd(c), bits = [];
   if (r && r.sauces) bits.push(ps.sauces.every(sauceById) && ps.sauces.length ? sauceText(ps.sauces) : "sabor sin elegir");
+  if (c.opciones) bits.push(ps.opcion && ALL.find(x => x.id === ps.opcion) ? ALL.find(x => x.id === ps.opcion).name : "sin elegir");
   if (ps.off.length) bits.push(sinText(ps.off));
   return c.label + (bits.length ? ": " + bits.join(", ") : "");
 }
@@ -1192,7 +1212,11 @@ function sheetHTML(p) {
     const remChips = rem.length
       ? `<p class="mini">¿Sin algo? Toca lo que no quieres que lleve.</p><div class="chips">${rem.map(id => `<button type="button" class="chip pick${ps.off.includes(id) ? " off" : ""}" aria-pressed="${ps.off.includes(id)}" data-part="${i}" data-ping="${id}">${esc(ING[id].name)}</button>`).join("")}</div>`
       : "";
-    return `<div class="spec part"><h4>${esc(c.label)}</h4>${sauceChips}${remChips}</div>`;
+    /* opciones (el refresco del combo): solo las que se pueden vender */
+    const optChips = c.opciones
+      ? `<p class="mini">Elige uno.</p><div class="chips">${c.opciones.map(id => ALL.find(x => x.id === id)).filter(sellable).map(o => `<button type="button" class="chip pick${ps.opcion === o.id ? " on" : ""}" aria-pressed="${ps.opcion === o.id}" data-part="${i}" data-popcion="${o.id}">${esc(o.name)}</button>`).join("")}</div>`
+      : "";
+    return `<div class="spec part"><h4>${esc(c.label)}</h4>${sauceChips}${optChips}${remChips}</div>`;
   }).join("") + `<p class="err" id="part-err" hidden></p>` : "";
   const ings = removable.length
     ? `<div class="spec"><h4>¿Sin algo?</h4><p class="mini">Toca lo que no quieres que lleve. Quitar no cambia el precio.</p><div class="ings">${fixedIds.map(id => ingChip(id, true, counts[id])).join("")}${removable.map(id => ingChip(id, false, counts[id])).join("")}</div></div>`
@@ -1238,7 +1262,7 @@ const store = {
 /* solo productos a la venta: un borrador o una bebida no disponible no se abre ni se queda en el carrito */
 const prod = id => ALL.find(p => p.id === id && sellable(p));
 const lineKey = (id, opt, sauces, off, comp) => [id, opt, sauces.join("+"), [...off].sort().join(","),
-  (comp || []).map(c => c.sauces.join("+") + "/" + [...c.off].sort().join(",")).join(";")].join("|");
+  (comp || []).map(c => c.sauces.join("+") + "/" + [...c.off].sort().join(",") + "/" + (c.opcion || "")).join(";")].join("|");
 let cart = store.get("carbon-cart-v2", []).filter(l => {
   const p = prod(l.id);
   return p && p.prices[l.opt] && Array.isArray(l.sauces) && Array.isArray(l.off)
@@ -1271,7 +1295,7 @@ function totals() {
 const totalTxt = t => money(t.sum);
 function saveCart() { store.set("carbon-cart-v2", cart); renderBar(); }
 function addToCart(id, opt, sauces, off, qty, comp) {
-  const cp = (comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off] }));
+  const cp = (comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off], opcion: c.opcion || "" }));
   const key = lineKey(id, opt, sauces, off, cp), ex = cart.find(l => l.key === key);
   if (ex) ex.qty += qty; else cart.push({ key, id, opt, sauces: [...sauces], off: [...off], comp: cp, qty });
   saveCart();
@@ -1597,6 +1621,9 @@ document.addEventListener("click", e => {
         else { ps.sauces = [...ps.sauces, id]; if (ps.sauces.length > 2) ps.sauces.shift(); }
         if (!c.unSabor && !ps.sauces.length) ps.sauces = [def];
         setPressed(`[data-part="${i}"][data-psauce]`, b => { const on = ps.sauces.includes(b.dataset.psauce); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+      } else if (pt.dataset.popcion) {
+        ps.opcion = pt.dataset.popcion;
+        setPressed(`[data-part="${i}"][data-popcion]`, b => { const on = b.dataset.popcion === ps.opcion; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
       } else {
         const id = pt.dataset.ping;
         ps.off = ps.off.includes(id) ? ps.off.filter(x => x !== id) : [...ps.off, id];
@@ -1610,12 +1637,12 @@ document.addEventListener("click", e => {
     if (t.closest("#add")) {
       if (current.sauces && !sel.sauces.length) { const er = document.getElementById("sauce-err"); er.hidden = false; er.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" }); return; }
       if (current.parts) {
-        const falta = current.parts.findIndex((c, i) => c.unSabor && !sauceById(sel.comp[i].sauces[0]));
+        const falta = current.parts.findIndex((c, i) => (c.unSabor && !sauceById(sel.comp[i].sauces[0])) || (c.opciones && !sel.comp[i].opcion));
         const unos = current.parts.map((c, i) => c.unSabor ? sel.comp[i].sauces[0] : null).filter(Boolean);
         const rep = current.repetidos === false && uniq(unos).length !== unos.length;
         if (falta >= 0 || rep) {
           const er = document.getElementById("part-err");
-          er.textContent = falta >= 0 ? `Elige el sabor de: ${current.parts[falta].label}.` : "En este combo los sabores no se repiten.";
+          er.textContent = falta >= 0 ? (current.parts[falta].opciones ? "Elige: " : "Elige el sabor de: ") + current.parts[falta].label + "." : "En este combo los sabores no se repiten.";
           er.hidden = false; er.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" }); return;
         }
       }
@@ -1631,7 +1658,7 @@ document.addEventListener("click", e => {
   const line = t.closest(".line");
   if (line) {
     const l = cart.find(x => x.key === line.dataset.key); if (!l) return;
-    if (t.closest("[data-edit]")) return swapSheet(false, prod(l.id), { opt: l.opt, sauces: l.sauces, off: l.off, comp: (l.comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off] })), qty: l.qty, editKey: l.key });
+    if (t.closest("[data-edit]")) return swapSheet(false, prod(l.id), { opt: l.opt, sauces: l.sauces, off: l.off, comp: (l.comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off], opcion: c.opcion || "" })), qty: l.qty, editKey: l.key });
     const d = t.closest("[data-line]");
     if (d) { l.qty += +d.dataset.line; if (l.qty < 1) cart = cart.filter(x => x !== l); }
     else if (t.closest("[data-remove]")) cart = cart.filter(x => x !== l);

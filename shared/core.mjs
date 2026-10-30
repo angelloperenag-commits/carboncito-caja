@@ -26,7 +26,8 @@ const combo = (name, price, parts, extra) => {
   c.draft = price == null || parts.some((x) => x.pend) || (parts.some((x) => x.unSabor) && typeof c.repetidos !== "boolean");
   return c;
 };
-const PAPAS_PEND = "Falta confirmar si lleva sus papas", ALITAS_PEND = "Falta confirmar si es orden completa y cuántas piezas";
+/* refrescos de 600 ml que se pueden elegir en un combo */
+const JARRITOS = ["jarritos-uva", "jarritos-pina", "jarritos-manzana", "jarritos-limon", "jarritos-tamarindo"];
 
 export const CATALOG = {
   sencilla: { name: "Sencilla", ...burger(["carne", "queso"], 60) },
@@ -42,22 +43,29 @@ export const CATALOG = {
   "alitas-mixto": { name: "Combo mixto de alitas", recipe: WINGS, fixed: ["alitas"], opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]] },
   /* combos (mismos ids y partes en el menú y en la caja) */
   "combo-carboncito": combo("CARBONCITO", 100, [
-    part("sencilla", "Hamburguesa sencilla"), part("papas", "Papas", { pend: "Falta confirmar la porción" }),
-    part("alitas", "4 alitas"), part(null, "Refresco de 600 ml", { pend: "Falta confirmar marca y sabor" }),
+    part("sencilla", "Hamburguesa sencilla con papas"), part("alitas", "4 alitas"),
+    part(null, "Refresco de 600 ml", { opciones: JARRITOS }),
   ]),
   "combo-rico": combo("Combo rico", 200, [
-    part("hawaiana", "Hamburguesa hawaiana", { pend: PAPAS_PEND }), part("alitas", "Alitas", { pend: ALITAS_PEND }),
-    part("salchipulpos", "Salchipulpos chicos (4 pulpos)"), part("hotdog", "Orden de hot dog", { pend: "Falta confirmar cuántos hot dogs y de cuáles" }),
+    part("hawaiana", "Hamburguesa hawaiana (sin papas)"), part("alitas", "Alitas (orden de 10)"),
+    part("salchipulpos", "Salchipulpos chicos (4 pulpos)"), part("hotdog", "Hot dogs sencillos (orden de 3)"),
   ]),
   "combo-domi": combo("Domi combo", 300, [
-    part("hawaiana", "Hamburguesa hawaiana 1", { pend: PAPAS_PEND }), part("hawaiana", "Hamburguesa hawaiana 2", { pend: PAPAS_PEND }),
-    part("alitas", "Alitas", { pend: ALITAS_PEND }), part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
-    part("hotdog", "Orden de hot dogs sencillos", { pend: "Falta confirmar cuántos hot dogs" }),
+    part("hawaiana", "Hamburguesa hawaiana 1 (sin papas)"), part("hawaiana", "Hamburguesa hawaiana 2 (sin papas)"),
+    part("alitas", "Alitas (orden de 10)"), part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
+    part("hotdog", "Hot dogs sencillos (orden de 3)"),
   ]),
-  "medio-alicombo": combo("1/2 Alicombo", null, [
+  "medio-alicombo": combo("1/2 Alicombo", 150, [
     part("alitas", "Media orden 1", { unSabor: true }), part("alitas", "Media orden 2", { unSabor: true }), part("alitas", "Media orden 3", { unSabor: true }),
-  ], { repetidos: null }),
-  /* bebidas: agregarlas aquí, en el menú (MENU.drinks) y en la caja (PRODUCTS, cat "drinks") con el mismo id */
+  ], { repetidos: true }),
+  /* bebidas (mismos ids en el menú y en la caja). La cerveza es solo de la caja: no está aquí. */
+  "jarritos-uva": bebida("Jarritos Uva", [["600 ml", 25]]),
+  "jarritos-pina": bebida("Jarritos Piña", [["600 ml", 25]]),
+  "jarritos-manzana": bebida("Jarritos Manzana", [["600 ml", 25]]),
+  "jarritos-limon": bebida("Jarritos Limón", [["600 ml", 25]]),
+  "jarritos-tamarindo": bebida("Jarritos Tamarindo", [["600 ml", 25]]),
+  /* falta confirmar el precio: mientras sea null no se vende */
+  "coca-cola": bebida("Coca-Cola de vidrio", [["500 ml", null]]),
 };
 /* se puede vender: no es borrador, está disponible y todas sus opciones tienen precio */
 export const sellable = (p) => !!p && !p.draft && p.disponible !== false && p.opts.every((o) => typeof o[1] === "number");
@@ -92,11 +100,17 @@ function componentes(p, combo) {
         if (!s.length) throw new Error(`Elige el sabor de: ${c.label}.`);
       } else s = salsas(e.sauces);
     }
-    return { label: c.label, sauces: s.map((x) => SAUCES[x]), sin: off.map((x) => N[x]), unSabor: !!c.unSabor };
+    /* parte con opciones (el refresco del combo): una, de la lista */
+    let opcion = "";
+    if (c.opciones) {
+      if (!c.opciones.includes(e.opcion) || !sellable(CATALOG[e.opcion])) throw new Error(`Elige: ${c.label}.`);
+      opcion = CATALOG[e.opcion].name;
+    }
+    return { label: c.label, sauces: s.map((x) => SAUCES[x]), sin: off.map((x) => N[x]), opcion, unSabor: !!c.unSabor };
   });
   const unos = out.filter((x) => x.unSabor).map((x) => x.sauces[0]);
   if (p.repetidos === false && new Set(unos).size !== unos.length) throw new Error(`En el ${p.name} los sabores no se repiten.`);
-  return out.map(({ label, sauces, sin }) => ({ label, sauces, sin }));
+  return out.map(({ label, sauces, sin, opcion }) => ({ label, sauces, sin, opcion }));
 }
 
 /* Revisa el pedido que llega del menú y lo deja listo para la caja. Lanza Error con un mensaje para el cliente. */

@@ -33,7 +33,8 @@
     c.draft = price == null || parts.some(function (x) { return x.pend; }) || (parts.some(function (x) { return x.unSabor; }) && typeof c.repetidos !== "boolean");
     return c;
   }
-  var PAPAS_PEND = "Falta confirmar si lleva sus papas", ALITAS_PEND = "Falta confirmar si es orden completa y cuántas piezas";
+  /* refrescos de 600 ml que se pueden elegir en un combo */
+  var JARRITOS = ["jarritos-uva", "jarritos-pina", "jarritos-manzana", "jarritos-limon", "jarritos-tamarindo"];
   var PRODUCTS = [
     { id: "sencilla", cat: "burgers", name: "Sencilla", opts: [["Con papas", 60], ["Sin papas", 50]], quitar: ["Queso amarillo"].concat(VEG) },
     { id: "hawaiana", cat: "burgers", name: "Hawaiana", opts: [["Con papas", 70], ["Sin papas", 60]], quitar: ["Queso amarillo", "Jamón", "Piña asada"].concat(VEG) },
@@ -48,22 +49,31 @@
     /* en Vender se muestran los sabores; cada uno abre las alitas con ese sabor para elegir la porción. El ranch se elige en el ticket. */
     { id: "alitas", cat: "wings", name: "Alitas", opts: [["Orden de 10", 110], ["Media orden (5)", 60]], porcion: ["Orden completa (10 piezas)", "Media orden (5 piezas)"], sauces: true, quitar: WINGS },
     { id: "alitas-mixto", cat: "combos", name: "Combo mixto de alitas", img: "alitas", opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]], quitar: WINGS },
-    combo("combo-carboncito", "CARBONCITO", "Hamburguesa sencilla, papas, 4 alitas y refresco de 600 ml", 100, [
-      part("sencilla", "Hamburguesa sencilla"), part("papas", "Papas", { pend: "Falta confirmar la porción" }),
-      part("alitas", "4 alitas"), part(null, "Refresco de 600 ml", { pend: "Falta confirmar marca y sabor" })
-    ]),
-    combo("combo-rico", "Combo rico", "Hamburguesa hawaiana, alitas, salchipulpos chicos y hot dog", 200, [
-      part("hawaiana", "Hamburguesa hawaiana", { pend: PAPAS_PEND }), part("alitas", "Alitas", { pend: ALITAS_PEND }),
-      part("salchipulpos", "Salchipulpos chicos (4 pulpos)"), part("hotdog", "Orden de hot dog", { pend: "Falta confirmar cuántos hot dogs y de cuáles" })
-    ]),
-    combo("combo-domi", "Domi combo", "2 hamburguesas hawaianas, alitas, salchipulpos grandes y hot dogs sencillos", 300, [
-      part("hawaiana", "Hamburguesa hawaiana 1", { pend: PAPAS_PEND }), part("hawaiana", "Hamburguesa hawaiana 2", { pend: PAPAS_PEND }),
-      part("alitas", "Alitas", { pend: ALITAS_PEND }), part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
-      part("hotdog", "Orden de hot dogs sencillos", { pend: "Falta confirmar cuántos hot dogs" })
-    ]),
-    combo("medio-alicombo", "1/2 Alicombo", "Tres medias órdenes de alitas, un sabor en cada una", null, [
+    combo("combo-carboncito", "CARBONCITO", "Hamburguesa sencilla con papas, 4 alitas y refresco de 600 ml", 100, [
+      part("sencilla", "Hamburguesa sencilla con papas"), part("alitas", "4 alitas"),
+      part(null, "Refresco de 600 ml", { opciones: JARRITOS })
+    ], { img: "combo-carboncito" }),
+    combo("combo-rico", "Combo rico", "Hamburguesa hawaiana, alitas (orden de 10), salchipulpos chicos y 3 hot dogs sencillos", 200, [
+      part("hawaiana", "Hamburguesa hawaiana (sin papas)"), part("alitas", "Alitas (orden de 10)"),
+      part("salchipulpos", "Salchipulpos chicos (4 pulpos)"), part("hotdog", "Hot dogs sencillos (orden de 3)")
+    ], { img: "combo-rico" }),
+    combo("combo-domi", "Domi combo", "2 hamburguesas hawaianas, alitas (orden de 10), salchipulpos grandes y 3 hot dogs sencillos", 300, [
+      part("hawaiana", "Hamburguesa hawaiana 1 (sin papas)"), part("hawaiana", "Hamburguesa hawaiana 2 (sin papas)"),
+      part("alitas", "Alitas (orden de 10)"), part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
+      part("hotdog", "Hot dogs sencillos (orden de 3)")
+    ], { img: "domi-combo" }),
+    combo("medio-alicombo", "1/2 Alicombo", "Tres medias órdenes de alitas, un sabor en cada una", 150, [
       part("alitas", "Media orden 1", { unSabor: true }), part("alitas", "Media orden 2", { unSabor: true }), part("alitas", "Media orden 3", { unSabor: true })
-    ], { repetidos: null })
+    ], { repetidos: true, img: "medio-alicombo" }),
+    /* bebidas: mismo id que el menú y el servidor. La cerveza es solo de la caja. */
+    { id: "jarritos-uva", cat: "drinks", name: "Jarritos Uva", desc: "Refresco de 600 ml", img: "jarritos-uva-600ml", opts: [["600 ml", 25]], quitar: [] },
+    { id: "jarritos-pina", cat: "drinks", name: "Jarritos Piña", desc: "Refresco de 600 ml", img: "jarritos-pina-600ml", opts: [["600 ml", 25]], quitar: [] },
+    { id: "jarritos-manzana", cat: "drinks", name: "Jarritos Manzana", desc: "Refresco de 600 ml", img: "jarritos-manzana-600ml", opts: [["600 ml", 25]], quitar: [] },
+    { id: "jarritos-limon", cat: "drinks", name: "Jarritos Limón", desc: "Refresco de 600 ml", img: "jarritos-limon-600ml", opts: [["600 ml", 25]], quitar: [] },
+    { id: "jarritos-tamarindo", cat: "drinks", name: "Jarritos Tamarindo", desc: "Refresco de 600 ml", img: "jarritos-tamarindo-600ml", opts: [["600 ml", 25]], quitar: [] },
+    /* falta confirmar el precio: se ve como borrador y no se vende */
+    { id: "coca-cola", cat: "drinks", name: "Coca-Cola de vidrio", desc: "500 ml", img: "coca-cola-vidrio-500ml", opts: [["500 ml", null]], quitar: [] },
+    { id: "cerveza", cat: "drinks", name: "Cerveza", desc: "Solo en el local", img: "cerveza-tarro-espuma", opts: [["Cerveza", 35]], quitar: [] }
   ];
   /* Bebidas se queda aunque esté vacía, para que se vea dónde van a ir */
   CATS = CATS.filter(function (c) { return c.id === "drinks" || PRODUCTS.some(function (p) { return p.cat === c.id; }); });
@@ -80,6 +90,8 @@
   }
   var SAUCES = ["Receta secreta sin salsa", "Piña habanero", "Mango habanero", "Tamarindo picante", "BBQ picante", "BBQ dulce"];
   /* color de cada sabor para su tarjeta (los mismos tonos del menú) */
+  /* nombre de archivo de cada sabor (fotos de 5 y 10 piezas en img/) */
+  var SLUG = { "Receta secreta sin salsa": "receta-secreta", "Piña habanero": "pina-habanero", "Mango habanero": "mango-habanero", "Tamarindo picante": "tamarindo-picante", "BBQ picante": "bbq-picante", "BBQ dulce": "bbq-dulce" };
   var TONO = { "Receta secreta sin salsa": "#c8803c", "Piña habanero": "#f2b33c", "Mango habanero": "#ff8f2a", "Tamarindo picante": "#8a2a1c", "BBQ picante": "#a8321a", "BBQ dulce": "#5a2414" };
   /* productos de alitas cuyo ranch se elige en el ticket (con o sin ranch) */
   var RANCH = { "alitas": 1, "alitas-mixto": 1 };
@@ -296,19 +308,22 @@
      ========================================================= */
   function lineKey(l) {
     return [l.pid, l.opt, l.sauces.join("+"), l.quitar.slice().sort().join(","),
-      (l.comps || []).map(function (c) { return c.sauces.join("+") + "/" + c.quitar.slice().sort().join(","); }).join(";")].join("|");
+      (l.comps || []).map(function (c) { return c.sauces.join("+") + "/" + c.quitar.slice().sort().join(",") + "/" + (c.opcion || ""); }).join(";")].join("|");
   }
   function salsaTxt(s) { return s.length === 2 ? "Mitad " + s[0] + " y mitad " + s[1] : s.length === 1 ? (s[0] === SAUCES[0] ? SAUCES[0] : "Salsa " + s[0]) : ""; }
+  /* opción elegida en un combo: en la caja se guarda el id; en un pedido web llega el nombre */
+  function optName(x) { var o = x ? prod(x) : null; return o ? o.name : x || ""; }
   /* una parte de combo: "4 alitas: Salsa BBQ dulce, sin ranch" */
-  function partTxt(label, sauces, quitar) {
+  function partTxt(label, sauces, quitar, opcion) {
     var b = [];
     if (sauces.length) b.push(salsaTxt(sauces));
+    if (opcion) b.push(optName(opcion));
     if (quitar.length) b.push("sin " + quitar.join(", ").toLowerCase());
     return label + (b.length ? ": " + b.join(", ") : "");
   }
   function lineDesc(l) {
     var p = prod(l.pid), parts = [];
-    if (p.parts) return p.parts.map(function (c, i) { return partTxt(c.label, l.comps[i].sauces, l.comps[i].quitar); }).join(" · ");
+    if (p.parts) return p.parts.map(function (c, i) { return partTxt(c.label, l.comps[i].sauces, l.comps[i].quitar, l.comps[i].opcion); }).join(" · ");
     if (p.opts.length > 1) parts.push(p.opts[l.opt][0]);
     if (l.sauces.length) parts.push(salsaTxt(l.sauces));
     if (l.quitar.length) parts.push("Sin " + l.quitar.join(", ").toLowerCase());
@@ -358,7 +373,7 @@
       var agotadas = db.settings.soldOut.alitas;
       tiles = SAUCES.map(function (n) {
         return '<button type="button" class="tile sabor' + (agotadas ? " out" : "") + '" data-sabor="' + esc(n) + '" style="border-bottom-color:' + TONO[n] + '">' +
-          '<img src="img/alitas.png" alt=""><b>' + esc(n) + "</b></button>";
+          '<img src="img/alitas-' + SLUG[n] + '-10.png" alt=""><b>' + esc(n) + "</b></button>";
       }).join("");
     } else {
       tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat && !p.hidden; }).map(function (p) {
@@ -543,7 +558,7 @@
      VENTANA: elegir opciones de un producto
      ========================================================= */
   /* lo elegido en cada parte de un combo; una parte de un solo sabor empieza sin elegir */
-  function basePart(c) { var r = c.pid ? prod(c.pid) : null; return { sauces: r && r.sauces && !c.unSabor ? [SAUCES[0]] : [], quitar: [] }; }
+  function basePart(c) { var r = c.pid ? prod(c.pid) : null; return { sauces: r && r.sauces && !c.unSabor ? [SAUCES[0]] : [], quitar: [], opcion: "" }; }
   /* sabor: alitas abiertas desde la tarjeta de un sabor (solo se elige la porción) */
   function openPick(p, sabor) {
     state.pick = { pid: p.id, opt: 0, sauces: sabor ? [sabor] : p.sauces ? [SAUCES[0]] : [], sabor: sabor || "", quitar: [], qty: 1, comps: p.parts ? p.parts.map(basePart) : [] };
@@ -558,6 +573,10 @@
       }).join("") + "</div>";
       if (r && r.quitar.length) h += "<div class='chips'>" + r.quitar.map(function (n) {
         return '<button type="button" class="chip' + (ps.quitar.indexOf(n) >= 0 ? " off" : "") + '" data-part="' + i + '" data-pquitar="' + esc(n) + '">Sin ' + esc(n.toLowerCase()) + "</button>";
+      }).join("") + "</div>";
+      /* opciones (el refresco del combo): las que se pueden vender y no están agotadas */
+      if (c.opciones) h += "<div class='chips'>" + c.opciones.map(prod).filter(function (o) { return o && sellable(o) && !db.settings.soldOut[o.id]; }).map(function (o) {
+        return '<button type="button" class="chip' + (ps.opcion === o.id ? " on" : "") + '" data-part="' + i + '" data-popcion="' + o.id + '">' + esc(o.name) + "</button>";
       }).join("") + "</div>";
       return '<div class="part">' + h + "</div>";
     }).join("");
@@ -577,9 +596,11 @@
     }
     /* sin precios: el desglose se ve en el ticket */
     var labels = s.sabor && p.porcion ? p.porcion : p.opts.map(function (o) { return o[0]; });
-    var opts = p.opts.length > 1 ? "<h4>" + (s.sabor ? "Porción" : "Opción") + "</h4>" + labels.map(function (o, i) {
-      return '<button type="button" class="opt' + (s.opt === i ? " on" : "") + '" data-popt="' + i + '"><i class="dot"></i><span>' + esc(o) + "</span></button>";
-    }).join("") : "";
+    /* alitas: la porción con su foto (10 piezas la orden completa, 5 la media) */
+    var opts = p.opts.length > 1 ? "<h4>" + (s.sabor ? "Porción" : "Opción") + "</h4>" + (s.sabor ? '<div class="porciones">' : "") + labels.map(function (o, i) {
+      var foto = s.sabor ? '<img src="img/alitas-' + SLUG[s.sabor] + "-" + (i === 0 ? 10 : 5) + '.png" alt="">' : "";
+      return '<button type="button" class="opt' + (s.sabor ? " foto" : "") + (s.opt === i ? " on" : "") + '" data-popt="' + i + '">' + foto + '<i class="dot"></i><span>' + esc(o) + "</span></button>";
+    }).join("") + (s.sabor ? "</div>" : "") : "";
     var base = p.base ? prod(p.base) : p, tocino = base.tocino
       ? "<h4>Tocino</h4><div class='chips'><button type='button' class='chip toggle" + (p.base ? " on" : "") + "' data-act='tocino'>" + (p.base ? "✓ " : "") + "Con tocino</button></div>" : "";
     var sauces = p.sauces && !s.sabor ? "<h4>Salsa <small>· toca dos para mitad y mitad</small></h4><div class='chips'>" + SAUCES.map(function (n) {
@@ -591,10 +612,12 @@
       return '<button type="button" class="chip' + (s.quitar.indexOf(n) >= 0 ? " off" : "") + '" data-quitar="' + esc(n) + '">' + esc(n) + "</button>";
     }).join("") + "</div>" : "";
     return '<div class="overlay"><div class="modal">' +
-      '<div class="m-head">' + imgOf(base) + "<h2>" + esc(s.sabor ? "Alitas · " + s.sabor : (base.tile || p.name)) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
-      '<div class="m-body">' + (p.desc ? '<p class="note">' + esc(p.desc) + "</p>" : "") + opts + tocino + sauces + quitar + "</div>" +
-      '<div class="m-foot"><div class="step"><button type="button" data-pq="-1">−</button><output>' + s.qty + '</output><button type="button" data-pq="1">+</button></div>' +
-      '<button type="button" class="btn" data-act="add-line">Agregar</button></div></div></div>';
+      '<div class="m-head">' + (s.sabor ? '<img src="img/alitas-' + SLUG[s.sabor] + '-10.png" alt="">' : imgOf(base)) + "<h2>" + esc(s.sabor ? "Alitas · " + s.sabor : (base.tile || p.name)) + '</h2><button type="button" class="x" data-act="close-layer" aria-label="Cerrar">×</button></div>' +
+      '<div class="m-body">' + (p.desc ? '<p class="note">' + esc(p.desc) + "</p>" : "") +
+      (venta ? "" : '<div class="confirm"><p><b>Todavía no se vende:</b> ' + pendientes(p).map(esc).join(", ") + "</p></div>") + opts + tocino + sauces + quitar + "</div>" +
+      (venta ? '<div class="m-foot"><div class="step"><button type="button" data-pq="-1">−</button><output>' + s.qty + '</output><button type="button" data-pq="1">+</button></div>' +
+        '<button type="button" class="btn" data-act="add-line">Agregar</button></div>'
+        : '<div class="m-foot"><button type="button" class="btn" disabled>Todavía no se vende</button></div>') + "</div></div>";
   }
 
   /* =========================================================
@@ -752,6 +775,8 @@
           else if (ps.sauces.length === 1 && ps.sauces[0] === SAUCES[0]) ps.sauces = [pv];
           else { ps.sauces.push(pv); if (ps.sauces.length > 2) ps.sauces.shift(); }
           if (!pc.unSabor && !ps.sauces.length) ps.sauces = [SAUCES[0]];
+        } else if ((pv = attr(el, "data-popcion"))) {
+          ps.opcion = pv;
         } else {
           pv = attr(el, "data-pquitar"); var qi = ps.quitar.indexOf(pv);
           if (qi >= 0) ps.quitar.splice(qi, 1); else ps.quitar.push(pv);
@@ -763,14 +788,17 @@
         if (!sellable(p)) return;
         if (p.parts) {
           var falta = null, unos = [];
-          p.parts.forEach(function (c, ix) { if (c.unSabor) { if (!s.comps[ix].sauces.length && !falta) falta = c.label; else unos.push(s.comps[ix].sauces[0]); } });
-          if (falta) { toast("Elige el sabor de: " + falta); return; }
+          p.parts.forEach(function (c, ix) {
+            if (c.opciones && !s.comps[ix].opcion && !falta) falta = c.label;
+            if (c.unSabor) { if (!s.comps[ix].sauces.length && !falta) falta = c.label; else unos.push(s.comps[ix].sauces[0]); }
+          });
+          if (falta) { toast("Falta elegir: " + falta); return; }
           if (p.repetidos === false && unos.some(function (x, ix) { return unos.indexOf(x) !== ix; })) { toast("En este combo los sabores no se repiten"); return; }
         }
         var quita = s.quitar.slice();
         if (RANCH[p.id] && !state.ranch) quita.push("Ranch");   /* toma lo elegido en el ticket */
         addLine({ pid: s.pid, opt: s.opt, sauces: s.sauces.slice(), quitar: quita, qty: s.qty, price: price(p, s.opt),
-          comps: s.comps.map(function (c) { return { sauces: c.sauces.slice(), quitar: c.quitar.slice() }; }) });
+          comps: s.comps.map(function (c) { return { sauces: c.sauces.slice(), quitar: c.quitar.slice(), opcion: c.opcion || "" }; }) });
         closeLayer(); return render();
       }
       if (find(t, '[data-act="close-layer"]') || (t.className === "overlay")) return closeLayer();
@@ -1034,7 +1062,7 @@
         (l.sin.length ? '<p class="sin">SIN: ' + esc(l.sin.join(", ")) + "</p>" : "") +
         (big && l.lleva.length ? '<p class="lleva">Lleva: ' + esc(l.lleva.join(", ")) + "</p>" : "") +
         (l.componentes && l.componentes.length ? '<div class="comps">' + l.componentes.map(function (c) {
-          return "<p><b>" + esc(c.label) + "</b>" + (c.sauces.length ? ' <span class="salsa">' + esc(salsaTxt(c.sauces)) + "</span>" : "") + (c.sin.length ? ' <span class="sin">SIN: ' + esc(c.sin.join(", ")) + "</span>" : "") + "</p>";
+          return "<p><b>" + esc(c.label) + "</b>" + (c.sauces.length ? ' <span class="salsa">' + esc(salsaTxt(c.sauces)) + "</span>" : "") + (c.opcion ? " " + esc(c.opcion) : "") + (c.sin.length ? ' <span class="sin">SIN: ' + esc(c.sin.join(", ")) + "</span>" : "") + "</p>";
         }).join("") + "</div>" : "") + "</div>";
     }).join("");
   }
@@ -1108,7 +1136,7 @@
     p.lines.forEach(function (l) {
       if (!prod(l.pid)) return;
       addLine({ pid: l.pid, opt: l.opt, sauces: l.sauces.slice(), quitar: l.sin.slice(), qty: l.qty, price: l.price,
-        comps: (l.componentes || []).map(function (c) { return { sauces: c.sauces.slice(), quitar: c.sin.slice() }; }) });
+        comps: (l.componentes || []).map(function (c) { return { sauces: c.sauces.slice(), quitar: c.sin.slice(), opcion: c.opcion || "" }; }) });
     });
     state.ranch = conRanch(state.cart);
     state.tipo = p.cliente.entrega === "domicilio" ? "domicilio" : "llevar";

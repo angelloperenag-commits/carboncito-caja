@@ -294,6 +294,11 @@ button.prow.on { border-color: var(--orange); background: var(--sel); }
 button.prow.on .dot { border-color: var(--orange); background: radial-gradient(circle, var(--orange) 45%, transparent 50%); }
 button.chip { all: unset; box-sizing: border-box; cursor: pointer; padding: 9px 13px; border-radius: 999px; background: var(--tint); font-size: 14px; display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid transparent; color: var(--ink); }
 button.chip.on { border-color: var(--orange); background: var(--sel); }
+.alas { display: grid; gap: 6px; margin-top: 6px; }
+.ala-row { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 10px; padding: 4px 8px; border-radius: 12px; background: var(--tint); }
+.ala-row i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(59, 36, 22, .3); }
+.ala-row span { font-size: 14px; }
+.ala-row .stepper button[disabled] { opacity: .35; }
 button.chip.off { border-color: #b3261e; background: #fbe9e6; color: #b3261e; text-decoration: line-through; }
 .spec.part h4 { margin-bottom: 4px; }
 button.prow:focus-visible, button.chip:focus-visible, .stepper button:focus-visible, .seg-btn:focus-visible, .remove:focus-visible, .cartbar:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
@@ -827,7 +832,7 @@ const MENU = {
     { id: "alitas", name: "Alitas", icon: "i-wings", builder: "wings", desc: "10 o 5 piezas con ranch", sauces: true,
       lead: "Orden de 10 piezas o media orden de 5, con su ranch.",
       recipe: WINGS, fixed: ["alitas"],
-      prices: [["Orden de 10 piezas", 110], ["Media orden · 5 piezas", 60]] },
+      prices: [["Orden de 10 piezas", 110], ["Media orden · 5 piezas", 60]], piezas: [10, 5] },
     { id: "alitas-mixto", name: "Combo mixto", icon: "i-wings", builder: "wings", desc: "Prueba todas las salsas: 2 alitas de cada sabor", mix: true,
       lead: "Piña habanero, mango habanero, tamarindo picante, BBQ picante y BBQ dulce, con su ranch.",
       recipe: WINGS, fixed: ["alitas"],
@@ -844,18 +849,18 @@ const MENU = {
       part("alitas", "4 alitas", { piezas: 4 }),
       part(null, "Refresco de 600 ml", { opciones: JARRITOS }),
     ]),
-    combo("combo-rico", "Combo rico", "Hamburguesa hawaiana, alitas (orden de 10), salchipulpos chicos y 3 hot dogs sencillos", 200, [
+    combo("combo-rico", "Combo rico", "Hamburguesa hawaiana, alitas (orden de 10), salchipulpos chicos y 3 hotdogs sencillos", 200, [
       part("hawaiana", "Hamburguesa hawaiana (sin papas)", { opt: 1 }),
       part("alitas", "Alitas (orden de 10)"),
       part("salchipulpos", "Salchipulpos chicos (4 pulpos)"),
-      part("hotdog", "Hot dogs sencillos (orden de 3)", { opt: 1 }),
+      part("hotdog", "Hotdogs sencillos (orden de 3)", { opt: 1 }),
     ]),
-    combo("combo-domi", "Domi combo", "2 hamburguesas hawaianas, alitas (orden de 10), salchipulpos grandes y 3 hot dogs sencillos", 300, [
+    combo("combo-domi", "Domi combo", "2 hamburguesas hawaianas, alitas (orden de 10), salchipulpos grandes y 3 hotdogs sencillos", 300, [
       part("hawaiana", "Hamburguesa hawaiana 1 (sin papas)", { opt: 1 }),
       part("hawaiana", "Hamburguesa hawaiana 2 (sin papas)", { opt: 1 }),
       part("alitas", "Alitas (orden de 10)"),
       part("salchipulpos", "Salchipulpos grandes (6 pulpos)", { opt: 1 }),
-      part("hotdog", "Hot dogs sencillos (orden de 3)", { opt: 1 }),
+      part("hotdog", "Hotdogs sencillos (orden de 3)", { opt: 1 }),
     ]),
     combo("medio-alicombo", "1/2 Alicombo", "Tres medias órdenes de alitas, un sabor en cada una", 150, [
       part("alitas", "Media orden 1", { unSabor: true, opt: 1 }),
@@ -919,7 +924,9 @@ function loadImg(file) {
   const im = new Image();
   im.onload = () => {
     const ok = () => { IMG[file] = { st: "ok", ar: im.naturalHeight / im.naturalWidth }; queueRefresh(); };
-    im.decode ? im.decode().then(ok, ok) : ok();  /* decodificada antes de mostrarse: sin tirones */
+    /* decodificada antes de mostrarse (sin tirones); si el navegador no termina de decodificar, se muestra igual a los 1.5 s */
+    let listo = false; const una = () => { if (!listo) { listo = true; ok(); } };
+    im.decode ? im.decode().then(una, una) : una(); setTimeout(una, 1500);
   };
   im.onerror = () => { IMG[file] = { st: "miss" }; queueRefresh(); };
   im.decoding = "async"; im.src = IMG_BASE + file;
@@ -987,19 +994,22 @@ const COMPOSE = {
     return { H, L, fit: 1, shadow: { x: 50, w: n === 3 ? 92 : 82 } };
   },
 
-  /* canasta con el ranch atrás y las alitas cayendo una por una (10 la orden, 5 la media).
-     Mitad y mitad: se alternan los dos sabores. Combo mixto: 2 de cada salsa (1 en el medio combo). */
+  /* canasta con el ranch atrás y las alitas cayendo una por una (10 la orden, 5 la media, 4 en el CARBONCITO).
+     Con el contador (s.alas) solo caen las que ya tienen sabor. Combo mixto: 2 de cada salsa (1 en el medio combo). */
   wings(p, s) {
     const H = 62, L = [];
     basket(L, false);
     if (!isOff(s, "ranch")) { const a = ING.ranch.at; L.push({ key: "ranch", ing: "ranch", x: a.x, y: a.y, w: a.w, z: 33, enter: "drop", order: 5 }); }
-    /* n: cuántas alitas cuando no es orden ni media (las 4 del combo CARBONCITO) */
-    const media = s.n ? s.n <= 5 : s.opt === 1, spots = (media ? WING_SPOTS_5 : WING_SPOTS_10).slice(0, s.n || 10);
-    const ids = p.mix ? SAUCES.filter(x => !x.plain).map(x => x.id) : s.sauces.length ? s.sauces : [SAUCES[0].id];
-    spots.forEach(([x, y, rot], i) => {
-      const id = ids[i % ids.length];
-      /* la clave lleva el sabor: si cambia, esa alita cae de nuevo con el sabor nuevo */
-      L.push({ key: "ala" + i + id, ing: "ala", file: `alitas-${id}-1.webp`, x, y, w: media ? 30 : 27, rot, z: 40 + i, enter: "drop", order: 6 + i, seq: i + 1 });
+    const n = s.n || (s.opt === 1 ? 5 : 10), media = n <= 5, spots = (media ? WING_SPOTS_5 : WING_SPOTS_10).slice(0, n);
+    const ids = p.mix ? spots.map((_, i) => SAUCES.filter(x => !x.plain)[i % 5].id)
+      : s.alas ? alasLista(s.alas).slice(0, n)
+      : spots.map(() => s.sauces[0] || SAUCES[0].id);
+    const vistas = {};
+    ids.forEach((id, i) => {
+      const [x, y, rot] = spots[i];
+      /* clave por sabor y número: al sumar una, cae la nueva y las demás se acomodan */
+      const k = vistas[id] = (vistas[id] || 0) + 1;
+      L.push({ key: "ala-" + id + "-" + k, ing: "ala", file: `alitas-${id}-1.webp`, x, y, w: media ? 30 : 27, rot, z: 40 + i, enter: "drop", order: 6 + i, seq: i + 1 });
     });
     return { H, L, fit: 1, shadow: { x: 50, w: 94 } };
   },
@@ -1035,7 +1045,7 @@ const COMPOSE = {
       /* refresco: el elegido; mientras no elija, se ve el primero de la lista */
       if (c.opciones) r = ALL.find(x => x.id === ps.opcion) || ALL.find(x => x.id === c.opciones[0]);
       if (!r) return null;
-      const sub = COMPOSE[r.builder](r, { opt: c.opt || 0, n: c.piezas, off: ps.off || [], sauces: ps.sauces || [] });
+      const sub = COMPOSE[r.builder](r, { opt: c.opt || 0, n: c.piezas, off: ps.off || [], sauces: ps.sauces || [], alas: ps.alas || null });
       return { i, sub, rid: r.id, tall: r.builder === "burger" || r.builder === "drink", drink: r.builder === "drink" };
     }).filter(Boolean);
     let rows = [items.filter(x => x.tall), items.filter(x => !x.tall)];
@@ -1066,10 +1076,32 @@ const COMPOSE = {
 /* ---------- icono de la lista: el producto ya armado con las mismas capas ---------- */
 /* producto del que una parte de combo toma sus opciones (aunque no se venda solo) */
 const partProd = c => c.pid ? ALL.find(x => x.id === c.pid) : null;
+/* alitas por sabor: { sabor: cuántas }. Se eligen con un contador hasta completar la orden. */
+const alasTotal = a => Object.values(a || {}).reduce((x, y) => x + y, 0);
+const alasLista = a => SAUCES.flatMap(s => Array((a && a[s.id]) || 0).fill(s.id));
+const alasClave = a => SAUCES.filter(s => a && a[s.id]).map(s => s.id + ":" + a[s.id]).join("+");
+const alasMax = (p, opt) => p.piezas ? p.piezas[opt] : 10;
+const piezasParte = c => c.piezas || (c.opt === 1 ? 5 : 10);
+/* "Salsa BBQ dulce" si todas son de un sabor; si no, "6 BBQ dulce, 4 Mango habanero" */
+function alasText(a, n) {
+  const e = SAUCES.filter(s => a && a[s.id]), t = alasTotal(a);
+  if (!e.length) return "sabores sin elegir";
+  if (e.length === 1 && t === n) return e[0].plain ? e[0].name : "Salsa " + e[0].name;
+  return e.map(s => a[s.id] + " " + s.name).join(", ") + (t < n ? ` (faltan ${n - t})` : "");
+}
+/* si baja la orden (de 10 a 5), se quitan las últimas que sobran */
+function recortarAlas(a, n) {
+  for (let i = SAUCES.length - 1; i >= 0 && alasTotal(a) > n; i--) {
+    const id = SAUCES[i].id; if (!a[id]) continue;
+    a[id] -= Math.min(a[id], alasTotal(a) - n); if (!a[id]) delete a[id];
+  }
+}
 const baseSauces = p => p.sauces ? [SAUCES[0].id] : [];
-/* lo elegido en cada parte de un combo: { sauces, off }. Una parte de un solo sabor empieza sin elegir. */
-const basePart = c => { const r = partProd(c); return { sauces: r && r.sauces && !c.unSabor ? [SAUCES[0].id] : [], off: [], opcion: "" }; };
-const baseSel = p => ({ opt: p.combo ? 1 : 0, off: [], sauces: baseSauces(p), comp: p.parts ? p.parts.map(basePart) : [] });
+/* lo elegido en cada parte de un combo: { sauces, off, alas }. Las alitas y las partes de un solo sabor empiezan sin elegir. */
+const basePart = c => { const r = partProd(c), alas = r && r.sauces && !c.unSabor; return { sauces: [], off: [], opcion: "", alas: alas ? {} : null }; };
+/* para el icono de la lista: todo ya elegido con la receta secreta */
+const baseSel = p => ({ opt: p.combo ? 1 : 0, off: [], sauces: baseSauces(p), alas: p.sauces ? { [SAUCES[0].id]: alasMax(p, 0) } : null,
+  comp: p.parts ? p.parts.map(c => { const b = basePart(c); if (b.alas) b.alas[SAUCES[0].id] = piezasParte(c); return b; }) : [] });
 function miniHTML(p) {
   const c = COMPOSE[p.builder](p, baseSel(p));
   if (!c.L.every(d => { const st = IMG[fileOf(d)]; return st && st.st === "ok"; })) return null;
@@ -1199,7 +1231,7 @@ const sinText = off => off.length ? "sin " + joinY(off.map(id => ING[id].name.to
 /* una línea por parte del combo: "4 alitas: salsa BBQ dulce, sin ranch" */
 function partText(c, ps) {
   const r = partProd(c), bits = [];
-  if (r && r.sauces) bits.push(ps.sauces.every(sauceById) && ps.sauces.length ? sauceText(ps.sauces) : "sabor sin elegir");
+  if (r && r.sauces) bits.push(ps.alas ? alasText(ps.alas, piezasParte(c)) : ps.sauces.every(sauceById) && ps.sauces.length ? sauceText(ps.sauces) : "sabor sin elegir");
   if (c.opciones) bits.push(ps.opcion && ALL.find(x => x.id === ps.opcion) ? ALL.find(x => x.id === ps.opcion).name : "sin elegir");
   if (ps.off.length) bits.push(sinText(ps.off));
   return c.label + (bits.length ? ": " + bits.join(", ") : "");
@@ -1208,9 +1240,22 @@ function custParts(p, s) {
   if (p.parts) return p.parts.map((c, i) => partText(c, s.comp[i]));
   return [
     p.prices.length > 1 ? p.prices[s.opt][0] : "",
-    p.sauces ? sauceText(s.sauces) : "",
+    p.sauces ? alasText(s.alas, alasMax(p, s.opt)) : "",
     s.off.length ? "Sin " + joinY(s.off.map(id => ING[id].name.toLowerCase())) : "",
   ].filter(Boolean);
+}
+/* vuelve a pintar un contador de alitas sin redibujar toda la ficha */
+function redibujarAlas(parte) {
+  const box = sheet.querySelector(`.alas-box[data-box="${parte}"]`); if (!box) return;
+  const a = parte === "" ? sel.alas : sel.comp[parte].alas;
+  box.outerHTML = alasHTML(a, parte === "" ? alasMax(current, sel.opt) : piezasParte(current.parts[parte]), parte);
+}
+/* contador de alitas por sabor; parte = índice de la parte del combo, o "" en las alitas solas */
+function alasHTML(a, n, parte) {
+  const t = alasTotal(a), at = parte === "" ? "" : ` data-apart="${parte}"`;
+  return `<div class="alas-box" data-box="${parte}"><p class="mini">Elige el sabor de cada alita. Llevas <b>${t} de ${n}</b>${t === n ? " ✓" : ""}.</p>
+    <div class="alas">${SAUCES.map(s => `<div class="ala-row"><i style="background:${s.tone}"></i><span>${esc(s.name)}</span>
+      <div class="stepper sm"><button type="button"${at} data-ala="${s.id}" data-ad="-1" aria-label="Una alita menos de ${esc(s.name)}"${a[s.id] ? "" : " disabled"}>−</button><output>${a[s.id] || 0}</output><button type="button"${at} data-ala="${s.id}" data-ad="1" aria-label="Una alita más de ${esc(s.name)}"${t < n ? "" : " disabled"}>+</button></div></div>`).join("")}</div></div>`;
 }
 
 /* ---------- ficha del producto ---------- */
@@ -1236,14 +1281,15 @@ function sheetHTML(p) {
     ? `<div class="spec"><h4>${p.combo ? "Papas" : "Elige"}</h4><div class="prices" role="radiogroup" aria-label="Opción">${p.prices.map(([l, v], i) => `<button type="button" class="prow pick${i === sel.opt ? " on" : ""}" role="radio" aria-checked="${i === sel.opt}" data-opt="${i}"><span><i class="dot"></i>${esc(l)}</span><b>${money(v)}</b></button>`).join("")}</div></div>`
     : "";
   const sauces = p.sauces
-    ? `<div class="spec"><h4>Salsa</h4><p class="mini">Viene con la receta secreta, sin salsa. Toca otra para cambiarla, o una segunda para mitad y mitad.</p><div class="chips" aria-label="Salsas">${SAUCES.map(s => `<button type="button" class="chip pick${sel.sauces.includes(s.id) ? " on" : ""}" aria-pressed="${sel.sauces.includes(s.id)}" data-sauce="${s.id}"><i style="background:${s.tone}"></i>${esc(s.name)}</button>`).join("")}</div><p class="err" id="sauce-err" hidden>Elige al menos una salsa para tus alitas.</p></div>`
+    ? `<div class="spec"><h4>Sabores</h4>${alasHTML(sel.alas, alasMax(p, sel.opt), "")}<p class="err" id="sauce-err" hidden></p></div>`
     : "";
   /* combo: cada parte con sus salsas y lo que se le puede quitar */
   const parts = p.parts ? p.parts.map((c, i) => {
     const r = partProd(c), ps = sel.comp[i];
     const rem = r ? uniq(r.recipe).filter(id => !r.fixed.includes(id)) : [];
     const sauceChips = r && r.sauces
-      ? `<p class="mini">${c.unSabor ? "Elige un sabor." : "Viene con la receta secreta, sin salsa. Toca otra para cambiarla, o una segunda para mitad y mitad."}</p><div class="chips" aria-label="Sabor de ${esc(c.label)}">${SAUCES.map(s => `<button type="button" class="chip pick${ps.sauces.includes(s.id) ? " on" : ""}" aria-pressed="${ps.sauces.includes(s.id)}" data-part="${i}" data-psauce="${s.id}"><i style="background:${s.tone}"></i>${esc(s.name)}</button>`).join("")}</div>`
+      ? (ps.alas ? alasHTML(ps.alas, piezasParte(c), i)
+        : `<p class="mini">Elige un sabor.</p><div class="chips" aria-label="Sabor de ${esc(c.label)}">${SAUCES.map(s => `<button type="button" class="chip pick${ps.sauces.includes(s.id) ? " on" : ""}" aria-pressed="${ps.sauces.includes(s.id)}" data-part="${i}" data-psauce="${s.id}"><i style="background:${s.tone}"></i>${esc(s.name)}</button>`).join("")}</div>`)
       : "";
     const remChips = rem.length
       ? `<p class="mini">¿Sin algo? Toca lo que no quieres que lleve.</p><div class="chips">${rem.map(id => `<button type="button" class="chip pick${ps.off.includes(id) ? " off" : ""}" aria-pressed="${ps.off.includes(id)}" data-part="${i}" data-ping="${id}">${esc(ING[id].name)}</button>`).join("")}</div>`
@@ -1297,13 +1343,17 @@ const store = {
 };
 /* solo productos a la venta: un borrador o una bebida no disponible no se abre ni se queda en el carrito */
 const prod = id => ALL.find(p => p.id === id && sellable(p));
-const lineKey = (id, opt, sauces, off, comp) => [id, opt, sauces.join("+"), [...off].sort().join(","),
-  (comp || []).map(c => c.sauces.join("+") + "/" + [...c.off].sort().join(",") + "/" + (c.opcion || "")).join(";")].join("|");
+const lineKey = (id, opt, sauces, off, comp, alas) => [id, opt, sauces.join("+"), [...off].sort().join(","),
+  (comp || []).map(c => c.sauces.join("+") + "/" + [...c.off].sort().join(",") + "/" + (c.opcion || "") + "/" + alasClave(c.alas)).join(";"), alasClave(alas)].join("|");
+/* alitas completas: cada una con sabor y exactamente las que lleva */
+const alasOk = (a, n) => !!a && typeof a === "object" && Object.keys(a).every(k => sauceById(k) && Number.isInteger(a[k]) && a[k] > 0) && alasTotal(a) === n;
 let cart = store.get("carbon-cart-v2", []).filter(l => {
   const p = prod(l.id);
   return p && p.prices[l.opt] && Array.isArray(l.sauces) && Array.isArray(l.off)
     && l.sauces.every(sauceById) && l.off.every(id => p.recipe.includes(id) && !p.fixed.includes(id))
-    && (!p.parts || (Array.isArray(l.comp) && l.comp.length === p.parts.length))
+    && (!p.sauces || alasOk(l.alas, alasMax(p, l.opt)))
+    && (!p.parts || (Array.isArray(l.comp) && l.comp.length === p.parts.length
+      && p.parts.every((c, i) => !(l.comp[i] && l.comp[i].alas) || alasOk(l.comp[i].alas, piezasParte(c)))))
     && Number.isInteger(l.qty) && l.qty >= 1 && l.qty <= 30;
 });
 /* datos del cliente: se recuerdan en este teléfono solo 30 días y se pueden borrar desde "Tu pedido" */
@@ -1330,10 +1380,11 @@ function totals() {
 }
 const totalTxt = t => money(t.sum);
 function saveCart() { store.set("carbon-cart-v2", cart); renderBar(); }
-function addToCart(id, opt, sauces, off, qty, comp) {
-  const cp = (comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off], opcion: c.opcion || "" }));
-  const key = lineKey(id, opt, sauces, off, cp), ex = cart.find(l => l.key === key);
-  if (ex) ex.qty += qty; else cart.push({ key, id, opt, sauces: [...sauces], off: [...off], comp: cp, qty });
+function addToCart(id, opt, sauces, off, qty, comp, alas) {
+  const cp = (comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off], opcion: c.opcion || "", alas: c.alas ? Object.assign({}, c.alas) : null }));
+  const al = alas ? Object.assign({}, alas) : null;
+  const key = lineKey(id, opt, sauces, off, cp, al), ex = cart.find(l => l.key === key);
+  if (ex) ex.qty += qty; else cart.push({ key, id, opt, sauces: [...sauces], off: [...off], comp: cp, alas: al, qty });
   saveCart();
 }
 const bar = document.getElementById("cartbar");
@@ -1510,7 +1561,8 @@ function submitOrder() {
   sending = true;
   btn.textContent = "Enviando…"; btn.classList.add("off");
   const body = {
-    items: cart.map(l => ({ id: l.id, opt: l.opt, sauces: l.sauces, off: l.off, combo: l.comp || [], qty: l.qty })),
+    items: cart.map(l => ({ id: l.id, opt: l.opt, sauces: l.sauces, off: l.off, sabores: l.alas || undefined, qty: l.qty,
+      combo: (l.comp || []).map(c => ({ sauces: c.sauces, off: c.off, opcion: c.opcion, sabores: c.alas || undefined })) })),
     cliente: { mode: form.mode, name: form.name, phone: form.phone, addr: form.addr, refs: form.refs, pay: form.pay, cash: form.cash, notes: form.notes, ticket: form.ticket, email: form.ticket === "correo" ? form.email : "" },
   };
   const waMsg = buildMessage();
@@ -1574,7 +1626,7 @@ function fillSheet(isCart, p, preset) {
   if (isCart) { current = null; sheet.innerHTML = cartHTML(); }
   else {
     current = p;
-    sel = Object.assign({ opt: 0, sauces: baseSauces(p), off: [], comp: p.parts ? p.parts.map(basePart) : [], qty: 1, editKey: null }, preset || {});
+    sel = Object.assign({ opt: 0, sauces: baseSauces(p), off: [], alas: {}, comp: p.parts ? p.parts.map(basePart) : [], qty: 1, editKey: null }, preset || {});
     sel.sauces = [...sel.sauces]; sel.off = [...sel.off];
     sheet.innerHTML = sheetHTML(p);
   }
@@ -1623,6 +1675,21 @@ document.addEventListener("click", e => {
     if (o) {
       sel.opt = +o.dataset.opt;
       setPressed("[data-opt]", b => { const on = b === o; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
+      /* alitas: si cambia la porción, el contador se ajusta al nuevo máximo */
+      if (current.sauces) { recortarAlas(sel.alas, alasMax(current, sel.opt)); redibujarAlas(""); }
+      return updateProduct(true);
+    }
+    /* contador de alitas por sabor (alitas solas o una parte de combo) */
+    const ab = t.closest("[data-ala]");
+    if (ab) {
+      const parte = ab.dataset.apart == null ? "" : +ab.dataset.apart;
+      const a = parte === "" ? sel.alas : sel.comp[parte].alas;
+      const n = parte === "" ? alasMax(current, sel.opt) : piezasParte(current.parts[parte]);
+      const id = ab.dataset.ala, d = +ab.dataset.ad;
+      if (d > 0 && alasTotal(a) >= n) return;
+      a[id] = Math.max(0, (a[id] || 0) + d); if (!a[id]) delete a[id];
+      redibujarAlas(parte);
+      const er = document.getElementById(parte === "" ? "sauce-err" : "part-err"); if (er) er.hidden = true;
       return updateProduct(true);
     }
     const ig = t.closest("[data-ing]");
@@ -1671,20 +1738,29 @@ document.addEventListener("click", e => {
     const q = t.closest("[data-qty]");
     if (q) { sel.qty = Math.max(1, Math.min(30, sel.qty + +q.dataset.qty)); return updateProduct(false); }
     if (t.closest("#add")) {
-      if (current.sauces && !sel.sauces.length) { const er = document.getElementById("sauce-err"); er.hidden = false; er.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" }); return; }
+      /* todas las alitas deben tener sabor */
+      if (current.sauces && alasTotal(sel.alas) !== alasMax(current, sel.opt)) {
+        const er = document.getElementById("sauce-err"), n = alasMax(current, sel.opt);
+        er.textContent = `Elige el sabor de las ${n} alitas (llevas ${alasTotal(sel.alas)}).`;
+        er.hidden = false; er.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" }); return;
+      }
       if (current.parts) {
-        const falta = current.parts.findIndex((c, i) => (c.unSabor && !sauceById(sel.comp[i].sauces[0])) || (c.opciones && !sel.comp[i].opcion));
+        const faltaAlas = (c, i) => sel.comp[i].alas && alasTotal(sel.comp[i].alas) !== piezasParte(c);
+        const falta = current.parts.findIndex((c, i) => (c.unSabor && !sauceById(sel.comp[i].sauces[0])) || (c.opciones && !sel.comp[i].opcion) || faltaAlas(c, i));
         const unos = current.parts.map((c, i) => c.unSabor ? sel.comp[i].sauces[0] : null).filter(Boolean);
         const rep = current.repetidos === false && uniq(unos).length !== unos.length;
         if (falta >= 0 || rep) {
-          const er = document.getElementById("part-err");
-          er.textContent = falta >= 0 ? (current.parts[falta].opciones ? "Elige: " : "Elige el sabor de: ") + current.parts[falta].label + "." : "En este combo los sabores no se repiten.";
+          const er = document.getElementById("part-err"), c = current.parts[falta];
+          er.textContent = falta < 0 ? "En este combo los sabores no se repiten."
+            : c.opciones ? `Elige: ${c.label}.`
+            : faltaAlas(c, falta) ? `Elige el sabor de las ${piezasParte(c)} alitas de: ${c.label} (llevas ${alasTotal(sel.comp[falta].alas)}).`
+            : `Elige el sabor de: ${c.label}.`;
           er.hidden = false; er.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" }); return;
         }
       }
       const editing = sel.editKey;
       if (editing) cart = cart.filter(x => x.key !== editing);
-      addToCart(current.id, sel.opt, sel.sauces, sel.off, sel.qty, sel.comp);
+      addToCart(current.id, sel.opt, sel.sauces, sel.off, sel.qty, sel.comp, current.sauces ? sel.alas : null);
       if (editing) return swapSheet(true);
       closeSheet(); setTimeout(bump, 300); return;
     }
@@ -1694,7 +1770,7 @@ document.addEventListener("click", e => {
   const line = t.closest(".line");
   if (line) {
     const l = cart.find(x => x.key === line.dataset.key); if (!l) return;
-    if (t.closest("[data-edit]")) return swapSheet(false, prod(l.id), { opt: l.opt, sauces: l.sauces, off: l.off, comp: (l.comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off], opcion: c.opcion || "" })), qty: l.qty, editKey: l.key });
+    if (t.closest("[data-edit]")) return swapSheet(false, prod(l.id), { opt: l.opt, sauces: l.sauces, off: l.off, comp: (l.comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off], opcion: c.opcion || "", alas: c.alas ? Object.assign({}, c.alas) : null })), alas: l.alas ? Object.assign({}, l.alas) : {}, qty: l.qty, editKey: l.key });
     const d = t.closest("[data-line]");
     if (d) { l.qty += +d.dataset.line; if (l.qty < 1) cart = cart.filter(x => x !== l); }
     else if (t.closest("[data-remove]")) cart = cart.filter(x => x !== l);

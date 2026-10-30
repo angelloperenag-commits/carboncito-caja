@@ -39,24 +39,24 @@ export const CATALOG = {
   "hotdog-tocino": { name: "Hotdog con tocino", recipe: ["hd_salchicha_tocino", ...HD], fixed: ["hd_salchicha_tocino"], opts: [["1 hotdog", 25], ["3 hotdogs", 50]] },
   salchipulpos: { name: "Salchipulpos", recipe: ["sp_papas", "salchipulpo", "sp_queso", "sp_catsup", "sp_valentina"], fixed: ["sp_papas", "salchipulpo"], opts: [["Chico (4 pulpos)", 40], ["Grande (6 pulpos)", 60]] },
   papas: { name: "Orden de papas", recipe: ["sp_papas", "sp_queso", "sp_catsup", "sp_valentina"], fixed: ["sp_papas"], opts: [["Chica", 30], ["Grande", 50]] },
-  alitas: { name: "Alitas", recipe: WINGS, fixed: ["alitas"], opts: [["Orden de 10", 110], ["Media orden (5)", 60]], sauces: true },
+  alitas: { name: "Alitas", recipe: WINGS, fixed: ["alitas"], opts: [["Orden de 10", 110], ["Media orden (5)", 60]], piezas: [10, 5], sauces: true },
   "alitas-mixto": { name: "Combo mixto de alitas", recipe: WINGS, fixed: ["alitas"], opts: [["10 alitas (2 de cada sabor)", 110], ["Medio combo (1 de cada sabor)", 60]] },
   /* combos (mismos ids y partes en el menú y en la caja) */
   "combo-carboncito": combo("CARBONCITO", 100, [
-    part("sencilla", "Hamburguesa sencilla con papas"), part("alitas", "4 alitas"),
+    part("sencilla", "Hamburguesa sencilla con papas"), part("alitas", "4 alitas", { piezas: 4 }),
     part(null, "Refresco de 600 ml", { opciones: JARRITOS }),
   ]),
   "combo-rico": combo("Combo rico", 200, [
     part("hawaiana", "Hamburguesa hawaiana (sin papas)"), part("alitas", "Alitas (orden de 10)"),
-    part("salchipulpos", "Salchipulpos chicos (4 pulpos)"), part("hotdog", "Hot dogs sencillos (orden de 3)"),
+    part("salchipulpos", "Salchipulpos chicos (4 pulpos)"), part("hotdog", "Hotdogs sencillos (orden de 3)"),
   ]),
   "combo-domi": combo("Domi combo", 300, [
     part("hawaiana", "Hamburguesa hawaiana 1 (sin papas)"), part("hawaiana", "Hamburguesa hawaiana 2 (sin papas)"),
     part("alitas", "Alitas (orden de 10)"), part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
-    part("hotdog", "Hot dogs sencillos (orden de 3)"),
+    part("hotdog", "Hotdogs sencillos (orden de 3)"),
   ]),
   "medio-alicombo": combo("1/2 Alicombo", 150, [
-    part("alitas", "Media orden 1", { unSabor: true }), part("alitas", "Media orden 2", { unSabor: true }), part("alitas", "Media orden 3", { unSabor: true }),
+    part("alitas", "Media orden 1", { unSabor: true, opt: 1 }), part("alitas", "Media orden 2", { unSabor: true, opt: 1 }), part("alitas", "Media orden 3", { unSabor: true, opt: 1 }),
   ], { repetidos: true }),
   /* bebidas (mismos ids en el menú y en la caja). La cerveza es solo de la caja: no está aquí. */
   "jarritos-uva": bebida("Jarritos Uva", [["600 ml", 25]]),
@@ -78,34 +78,61 @@ const PAYS = { efectivo: "Efectivo", transferencia: "Transferencia" };
 const TICKETS = { no: "Sin ticket", correo: "Ticket por correo", pdf: "Ticket en PDF (lo descargó el cliente)" };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/* solo claves propias: "constructor" o "__proto__" no cuentan como sabor, producto ni opción */
+const own = (o, k) => typeof k === "string" && Object.prototype.hasOwnProperty.call(o, k);
 const str = (v, max) => String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
 
-/* salsas de unas alitas: hasta dos (mitad y mitad); si no eligió, la receta secreta */
+/* salsas de unas alitas en pedidos de antes: hasta dos (mitad y mitad); si no eligió, la receta secreta */
 function salsas(list) {
-  const s = [...new Set((Array.isArray(list) ? list : []).filter((x) => SAUCES[x]))].slice(0, 2);
+  const s = [...new Set((Array.isArray(list) ? list : []).filter((x) => own(SAUCES, x)))].slice(0, 2);
   return s.length ? s : ["receta-secreta"];
 }
+/* Cuántas alitas de cada sabor: { sabor: cuántas }, y deben sumar exactamente n.
+   Si el pedido no trae "sabores" (menú viejo en caché), se reparten entre sus 1 o 2 salsas. */
+function repartir(sabores, n, viejas, nombre) {
+  const m = {};
+  if (sabores && typeof sabores === "object" && !Array.isArray(sabores)) {
+    for (const [k, v] of Object.entries(sabores)) {
+      const c = Number(v);   /* solo enteros: 2.5 alitas no existe */
+      if (own(SAUCES, k) && Number.isInteger(c) && c > 0 && c <= 10) m[k] = (m[k] || 0) + c;
+    }
+  } else {
+    const s = salsas(viejas);
+    s.forEach((k, i) => { m[k] = Math.floor(n / s.length) + (i < n % s.length ? 1 : 0); });
+  }
+  const total = Object.values(m).reduce((a, b) => a + b, 0);
+  if (total !== n) throw new Error(`Elige el sabor de las ${n} alitas de ${nombre}: llevas ${total}.`);
+  return m;
+}
+/* texto para la cocina: "BBQ dulce" si todas son de un sabor; si no, "6 × BBQ dulce", "4 × Mango habanero" */
+const alasTexto = (m) => {
+  const e = Object.entries(m);
+  return e.length === 1 ? [SAUCES[e[0][0]]] : e.map(([k, c]) => `${c} × ${SAUCES[k]}`);
+};
+/* alitas que lleva una parte de combo: las que diga (piezas) o la orden (10) o media (5) */
+const piezasParte = (c) => c.piezas || (c.opt === 1 ? 5 : 10);
 /* lo elegido en cada parte de un combo, revisado contra el producto de esa parte */
 function componentes(p, combo) {
   const elegido = Array.isArray(combo) ? combo : [];
   if (elegido.length !== p.parts.length) throw new Error(`Falta personalizar tu ${p.name}.`);
   const out = p.parts.map((c, i) => {
-    const r = c.pid ? CATALOG[c.pid] : null, e = elegido[i] || {};
+    const r = c.pid && own(CATALOG, c.pid) ? CATALOG[c.pid] : null, e = elegido[i] || {};
     const off = r ? [...new Set((Array.isArray(e.off) ? e.off : []).filter((x) => r.recipe.includes(x) && !r.fixed.includes(x)))] : [];
     let s = [];
     if (r && r.sauces) {
       if (c.unSabor) {
-        s = (Array.isArray(e.sauces) ? e.sauces : []).filter((x) => SAUCES[x]).slice(0, 1);
+        s = (Array.isArray(e.sauces) ? e.sauces : []).filter((x) => own(SAUCES, x)).slice(0, 1);
         if (!s.length) throw new Error(`Elige el sabor de: ${c.label}.`);
-      } else s = salsas(e.sauces);
+      } else s = null;
     }
     /* parte con opciones (el refresco del combo): una, de la lista */
     let opcion = "";
     if (c.opciones) {
-      if (!c.opciones.includes(e.opcion) || !sellable(CATALOG[e.opcion])) throw new Error(`Elige: ${c.label}.`);
+      if (!c.opciones.includes(e.opcion) || !own(CATALOG, e.opcion) || !sellable(CATALOG[e.opcion])) throw new Error(`Elige: ${c.label}.`);
       opcion = CATALOG[e.opcion].name;
     }
-    return { label: c.label, sauces: s.map((x) => SAUCES[x]), sin: off.map((x) => N[x]), opcion, unSabor: !!c.unSabor };
+    const textoSalsas = s === null ? alasTexto(repartir(e.sabores, piezasParte(c), e.sauces, `tu ${p.name} (${c.label})`)) : s.map((x) => SAUCES[x]);
+    return { label: c.label, sauces: textoSalsas, sin: off.map((x) => N[x]), opcion, unSabor: !!c.unSabor };
   });
   const unos = out.filter((x) => x.unSabor).map((x) => x.sauces[0]);
   if (p.repetidos === false && new Set(unos).size !== unos.length) throw new Error(`En el ${p.name} los sabores no se repiten.`);
@@ -118,32 +145,32 @@ export function normalizeOrder(body) {
   const items = Array.isArray(body.items) ? body.items.slice(0, 40) : [];
   if (!items.length) throw new Error("El pedido no tiene productos.");
   const lines = items.map((it) => {
-    const p = CATALOG[it && it.id];
+    const p = it && own(CATALOG, it.id) ? CATALOG[it.id] : null;
     if (!p) throw new Error("Hay un producto que ya no está en el menú.");
     if (!sellable(p)) throw new Error(`${p.name} todavía no está a la venta.`);
     const opt = Number(it.opt) || 0;
     if (!p.opts[opt]) throw new Error("Hay una opción que ya no existe.");
     const qty = Math.max(1, Math.min(30, Math.floor(Number(it.qty) || 1)));
     const off = [...new Set((Array.isArray(it.off) ? it.off : []).filter((x) => p.recipe.includes(x) && !p.fixed.includes(x)))];
-    const sauces = p.sauces ? salsas(it.sauces) : [];
+    const sauces = p.sauces ? alasTexto(repartir(it.sabores, p.piezas[opt], it.sauces, "tu orden")) : [];
     const counts = {};
     p.recipe.forEach((x) => { if (!off.includes(x)) counts[x] = (counts[x] || 0) + 1; });
     return {
       pid: it.id, name: p.name, opt, optLabel: p.opts.length > 1 ? p.opts[opt][0] : "", qty, price: p.opts[opt][1],
-      sauces: sauces.map((s) => SAUCES[s]),
+      sauces,
       sin: off.map((x) => N[x]),
       lleva: Object.keys(counts).map((x) => N[x] + (counts[x] > 1 ? " ×" + counts[x] : "")),
       componentes: p.parts ? componentes(p, it.combo) : [],
     };
   });
   const c = body.cliente || {};
-  const mode = MODES[c.mode] ? c.mode : "domicilio";
+  const mode = own(MODES, c.mode) ? c.mode : "domicilio";
   const cliente = {
     nombre: str(c.name, 60), telefono: str(c.phone, 20).replace(/[^\d+ ]/g, ""), entrega: mode, entregaLabel: MODES[mode],
     direccion: mode === "domicilio" ? str(c.addr, 200) : "", referencias: mode === "domicilio" ? str(c.refs, 160) : "",
-    pago: PAYS[c.pay] ? c.pay : "efectivo", pagaCon: Math.max(0, Math.floor(Number(String(c.cash || "").replace(/[^\d.]/g, "")) || 0)),
+    pago: own(PAYS, c.pay) ? c.pay : "efectivo", pagaCon: Math.max(0, Math.floor(Number(String(c.cash || "").replace(/[^\d.]/g, "")) || 0)),
     notas: str(c.notes, 300),
-    ticket: TICKETS[c.ticket] ? c.ticket : "no",
+    ticket: own(TICKETS, c.ticket) ? c.ticket : "no",
   };
   cliente.ticketLabel = TICKETS[cliente.ticket];
   cliente.email = cliente.ticket === "correo" ? str(c.email, 120) : "";
@@ -244,7 +271,7 @@ async function fallo(store, k) {
    n8n los recoge (GET /api/avisos), manda el WhatsApp y los borra (POST /api/avisos/ok). */
 const AVISO = { aceptado: "recibido", listo: "listo", rechazado: "rechazado" };
 export async function encolarAviso(store, p, now = new Date()) {
-  const tipo = AVISO[p.estado];
+  const tipo = own(AVISO, p.estado) ? AVISO[p.estado] : "";
   const tel = String(p.cliente.telefono || "").replace(/\D/g, "").slice(-10);
   if (!tipo || tel.length !== 10) return null;
   const a = {
@@ -291,7 +318,12 @@ export async function handle(req, store, cfg, ip = "") {
       if (req.method === "GET") {
         const { blobs } = await store.list({ prefix: "aviso/" });
         const avisos = [];
-        for (const b of blobs.slice(0, 20)) { const a = await store.get(b.key, { type: "json" }); if (a) avisos.push(a); }
+        /* los de más de un día ya no sirven (la PC estuvo apagada): se borran para no guardar teléfonos de más */
+        for (const b of blobs.slice(0, 50)) {
+          const a = await store.get(b.key, { type: "json" });
+          if (a && Date.now() - new Date(a.t).getTime() > 864e5) await store.delete(b.key);
+          else if (a && avisos.length < 20) avisos.push(a);
+        }
         return json({ ok: true, avisos });
       }
       if (req.method === "POST") {

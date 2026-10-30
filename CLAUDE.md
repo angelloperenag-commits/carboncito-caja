@@ -40,13 +40,13 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. 777 113 8935.
 - Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $90. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
 - Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Llevan jitomate, cebolla, catsup, mostaza y chiles (todo se puede quitar). Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50, con queso de nachos, catsup y Valentina (se pueden quitar).
-- Alitas, orden de 10 a $110 o media orden de 5 a $60, por defecto "Receta secreta sin salsa"; salsas: piña habanero, mango habanero, tamarindo picante, BBQ picante, BBQ dulce; se permite mitad y mitad. Llevan ranch (se puede quitar). Las verduras no siempre van: no se anuncian ni aparecen para quitar.
+- Alitas, orden de 10 a $110 o media orden de 5 a $60. Sabores: receta secreta sin salsa, piña habanero, mango habanero, tamarindo picante, BBQ picante y BBQ dulce. El cliente reparte las alitas por sabor con un contador (− / +) hasta completar 10 o 5 (4 en el CARBONCITO) y no puede agregarlas hasta que todas tengan sabor. El pedido manda `sabores: { sabor: cuántas }` (en combos, por parte) y el servidor exige que sumen exacto; responde `["6 × BBQ dulce", "4 × Mango habanero"]` o el nombre solo si son de un sabor. Pedidos de un menú viejo con `sauces` (mitad y mitad) se reparten a la mitad. Llevan ranch (se puede quitar). Las verduras no siempre van: no se anuncian ni aparecen para quitar.
 - Combo mixto de alitas (`alitas-mixto`): 10 alitas, 2 de cada una de las 5 salsas, $110; medio combo, 1 de cada salsa, $60. No se eligen salsas.
 - Lo que se puede quitar son exclusiones ("sin"), nunca extras. Un ingrediente sin foto (`noLayer`) se puede quitar pero no se dibuja.
 - Combos (categoría Combos): precio fijo y partes (`parts`). Cada parte toma de su producto (`pid`) las salsas y lo que se puede quitar; `unSabor` pide exactamente un sabor; `opciones` pide elegir uno de una lista (el refresco); `pend` marca algo por confirmar. Un combo queda en **borrador** (no aparece en el menú, la caja no deja venderlo y el servidor lo rechaza) mientras le falte el precio, tenga un `pend` o falte `repetidos`. Hoy los 4 se venden:
   - CARBONCITO $100: hamburguesa sencilla con sus papas, 4 alitas (sabor a elegir) y un Jarritos de 600 ml a elegir (incluido en el precio).
-  - Combo rico $200: hamburguesa hawaiana sin papas, alitas orden de 10, salchipulpos chicos y 3 hot dogs sencillos.
-  - Domi combo $300: 2 hamburguesas hawaianas sin papas, alitas orden de 10, salchipulpos grandes y 3 hot dogs sencillos.
+  - Combo rico $200: hamburguesa hawaiana sin papas, alitas orden de 10, salchipulpos chicos y 3 hotdogs sencillos.
+  - Domi combo $300: 2 hamburguesas hawaianas sin papas, alitas orden de 10, salchipulpos grandes y 3 hotdogs sencillos.
   - 1/2 Alicombo $150: 3 medias órdenes, un sabor cada una; se pueden repetir.
   El pedido lleva `combo: [{ sauces, off, opcion }]` por parte y el servidor regresa `componentes: [{ label, sauces, sin, opcion }]`.
 - Bebidas: Jarritos Uva, Piña, Manzana, Limón y Tamarindo de 600 ml a $25 (menú, caja y servidor). Coca-Cola de vidrio 500 ml a $25 (menú, caja y servidor). Cerveza $35: **solo en la caja** (no está en el menú ni en el servidor). Para agregar otra: `bebida(...)` en `shared/core.mjs` y en el menú, y en `PRODUCTS` de la caja con `cat: "drinks"`. Si hay menos de 5 a la venta, la sección se rellena con espacios "Próximamente" (`BEBIDA_ESPACIOS`).
@@ -58,7 +58,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 - Las tarjetas y las ventanas de personalización no muestran precios: solo foto grande y nombre. El desglose de precios está en el ticket (y en Ajustes). El menú web sí muestra precios.
 - Un solo botón "Hotdog": en su ventana, la pastilla "Con tocino" cambia la línea a `hotdog-tocino` (mismo id del menú y el servidor) y cobra su precio. `hotdog-tocino` tiene `hidden: true` en `PRODUCTS`.
-- Alitas: la pestaña muestra un botón por sabor con su foto de 10 piezas; al tocarlo se elige la porción con las fotos de 10 y 5 piezas. Para mezclar se agregan varios sabores. No hay mitad y mitad desde la caja (los pedidos web que lo traen se ven igual).
+- Alitas: la pestaña muestra un botón por sabor con su foto de 10 piezas (al tocarlo se elige la porción con las fotos de 10 y 5 piezas) y "Alitas personalizadas", que reparte las alitas por sabor con un contador. Las alitas de los combos también usan el contador. Para mezclar se agregan varios sabores. No hay mitad y mitad desde la caja (los pedidos web que lo traen se ven igual).
 - Ranch: cuando el ticket tiene alitas aparece "Con ranch / Sin ranch" y aplica a todas las alitas y al combo mixto (`RANCH` en `app.js`).
 - El combo mixto está en Combos. Bebidas siempre tiene pestaña, en la caja y en el menú web, con 5 espacios "Próximamente" (`BEBIDA_ESPACIOS` en `app.js` y en el menú) que no se pueden tocar; cada bebida real ocupa uno.
 - Arriba del ticket: Vaciar (rojo, bote de basura) y Por cobrar (verde). Abajo solo Total y Cobrar. "Cuentas (n)" en la fila de categorías abre las cuentas por cobrar.
@@ -86,3 +86,10 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Netlify no puede llamar a la PC, así que n8n pregunta: al aceptar, marcar listo o rechazar un pedido web, el servidor deja un aviso en `aviso/…`; el flujo `Carboncito · Avisos de pedidos` (`n8n/carboncito-pedidos.json`) lee `GET /api/avisos` con la cabecera `x-avisos-token`, manda el texto por Evolution y borra el aviso con `POST /api/avisos/ok`. Corre cada 30 s de viernes a domingo, 5 pm a 1 am. Si falla se reintenta; pasada 1 hora se descarta.
 - El sitio de pruebas es privado (Netlify pide iniciar sesión), así que n8n solo puede leer producción.
 - La PC debe estar encendida y con internet para que salgan los mensajes; si no, los pedidos siguen llegando a la caja igual.
+
+## Seguridad (revisión antes de pasar a producción)
+
+- El servidor solo acepta claves propias de sus catálogos (`own()` en `shared/core.mjs`): "constructor" o "__proto__" no cuentan como producto, sabor, entrega, pago ni ticket. Las cantidades de alitas deben ser enteros.
+- Todo lo que viene del cliente se pinta con `esc()` en la caja y en el menú. La CSP del sitio no cambió y no hay scripts externos.
+- Los avisos para n8n de más de un día se borran solos al leer la cola, para no guardar teléfonos de más.
+- Ninguna llave real está en el repositorio ni en su historial (las de n8n y Evolution viven solo en la PC de la casa).

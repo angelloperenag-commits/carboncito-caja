@@ -841,27 +841,27 @@ const MENU = {
   combos: [
     combo("combo-carboncito", "CARBONCITO", "Hamburguesa sencilla con papas, 4 alitas y refresco de 600 ml", 100, [
       part("sencilla", "Hamburguesa sencilla con papas"),
-      part("alitas", "4 alitas"),
+      part("alitas", "4 alitas", { piezas: 4 }),
       part(null, "Refresco de 600 ml", { opciones: JARRITOS }),
-    ], { file: "combo-carboncito.webp" }),
+    ]),
     combo("combo-rico", "Combo rico", "Hamburguesa hawaiana, alitas (orden de 10), salchipulpos chicos y 3 hot dogs sencillos", 200, [
-      part("hawaiana", "Hamburguesa hawaiana (sin papas)"),
+      part("hawaiana", "Hamburguesa hawaiana (sin papas)", { opt: 1 }),
       part("alitas", "Alitas (orden de 10)"),
       part("salchipulpos", "Salchipulpos chicos (4 pulpos)"),
-      part("hotdog", "Hot dogs sencillos (orden de 3)"),
-    ], { file: "combo-rico.webp" }),
+      part("hotdog", "Hot dogs sencillos (orden de 3)", { opt: 1 }),
+    ]),
     combo("combo-domi", "Domi combo", "2 hamburguesas hawaianas, alitas (orden de 10), salchipulpos grandes y 3 hot dogs sencillos", 300, [
-      part("hawaiana", "Hamburguesa hawaiana 1 (sin papas)"),
-      part("hawaiana", "Hamburguesa hawaiana 2 (sin papas)"),
+      part("hawaiana", "Hamburguesa hawaiana 1 (sin papas)", { opt: 1 }),
+      part("hawaiana", "Hamburguesa hawaiana 2 (sin papas)", { opt: 1 }),
       part("alitas", "Alitas (orden de 10)"),
-      part("salchipulpos", "Salchipulpos grandes (6 pulpos)"),
-      part("hotdog", "Hot dogs sencillos (orden de 3)"),
-    ], { file: "domi-combo.webp" }),
+      part("salchipulpos", "Salchipulpos grandes (6 pulpos)", { opt: 1 }),
+      part("hotdog", "Hot dogs sencillos (orden de 3)", { opt: 1 }),
+    ]),
     combo("medio-alicombo", "1/2 Alicombo", "Tres medias órdenes de alitas, un sabor en cada una", 150, [
-      part("alitas", "Media orden 1", { unSabor: true }),
-      part("alitas", "Media orden 2", { unSabor: true }),
-      part("alitas", "Media orden 3", { unSabor: true }),
-    ], { repetidos: true, file: "medio-alicombo.webp" }),
+      part("alitas", "Media orden 1", { unSabor: true, opt: 1 }),
+      part("alitas", "Media orden 2", { unSabor: true, opt: 1 }),
+      part("alitas", "Media orden 3", { unSabor: true, opt: 1 }),
+    ], { repetidos: true }),
   ],
   /* bebidas: { id, name, desc, lead, file (foto WebP en img/; sin foto se ve un marcador con el nombre),
      prices: [["600 ml", 25], ...] (una fila por presentación), disponible: true/false, builder: "drink", recipe: [], fixed: [] }.
@@ -930,7 +930,12 @@ function filesOf(p) {
   if (p.builder === "hotdog") f.push(ING.hd_pan_atras.file);
   if (p.builder === "wings") f.push("canasta.webp", "canasta-frente.webp", ...SAUCES.map(s => `alitas-${s.id}-1.webp`));
   if (p.builder === "loaded") f.push("canasta.webp", "canasta-frente.webp", "salchipulpos-6.webp");
-  if (p.builder === "drink" || p.builder === "combo") f.push(p.file);
+  if (p.builder === "drink") f.push(p.file);
+  /* combo: las fotos de cada parte (y de los refrescos que se pueden elegir) */
+  if (p.parts) p.parts.forEach(c => {
+    const r = partProd(c); if (r) f.push(...filesOf(r));
+    (c.opciones || []).forEach(id => { const o = ALL.find(x => x.id === id); if (o) f.push(o.file); });
+  });
   return uniq(f.filter(Boolean));
 }
 let rq = 0;
@@ -988,7 +993,8 @@ const COMPOSE = {
     const H = 62, L = [];
     basket(L, false);
     if (!isOff(s, "ranch")) { const a = ING.ranch.at; L.push({ key: "ranch", ing: "ranch", x: a.x, y: a.y, w: a.w, z: 33, enter: "drop", order: 5 }); }
-    const media = s.opt === 1, spots = media ? WING_SPOTS_5 : WING_SPOTS_10;
+    /* n: cuántas alitas cuando no es orden ni media (las 4 del combo CARBONCITO) */
+    const media = s.n ? s.n <= 5 : s.opt === 1, spots = (media ? WING_SPOTS_5 : WING_SPOTS_10).slice(0, s.n || 10);
     const ids = p.mix ? SAUCES.filter(x => !x.plain).map(x => x.id) : s.sauces.length ? s.sauces : [SAUCES[0].id];
     spots.forEach(([x, y, rot], i) => {
       const id = ids[i % ids.length];
@@ -1020,9 +1026,40 @@ const COMPOSE = {
     return { H: 70, L: [{ key: "bebida", ing: "bebida", file: p.file || null, label: p.name, x: 50, y: 4, w: 40, z: 1, enter: "pop", order: 0 }], fit: 1, shadow: { x: 50, w: 46 } };
   },
 
-  /* combo: su foto si la hay (file); si no, un marcador con el nombre. Lo que lleva se lee abajo, parte por parte. */
-  combo(p) {
-    return { H: 56, L: [{ key: "combo", ing: "combo", file: p.file || null, label: p.name, x: 50, y: 4, w: 70, z: 1, enter: "pop", order: 0 }], fit: 1, shadow: { x: 50, w: 74 } };
+  /* combo: cada parte se arma con su propio constructor y se acomoda junto a las demás.
+     Atrás lo alto (hamburguesas y refresco) y adelante lo bajo (canastas y hotdogs), así nada queda tapado.
+     El refresco va más grande que la hamburguesa. */
+  combo(p, s) {
+    const items = p.parts.map((c, i) => {
+      let r = partProd(c), ps = (s.comp && s.comp[i]) || basePart(c);
+      /* refresco: el elegido; mientras no elija, se ve el primero de la lista */
+      if (c.opciones) r = ALL.find(x => x.id === ps.opcion) || ALL.find(x => x.id === c.opciones[0]);
+      if (!r) return null;
+      const sub = COMPOSE[r.builder](r, { opt: c.opt || 0, n: c.piezas, off: ps.off || [], sauces: ps.sauces || [] });
+      return { i, sub, rid: r.id, tall: r.builder === "burger" || r.builder === "drink", drink: r.builder === "drink" };
+    }).filter(Boolean);
+    let rows = [items.filter(x => x.tall), items.filter(x => !x.tall)];
+    /* si todo va en una fila (1/2 Alicombo), se reparte en dos para que no queden chiquitas */
+    const una = rows[0].length ? rows[0] : rows[1];
+    if ((!rows[0].length || !rows[1].length) && una.length > 2) { const m = Math.ceil(una.length / 2); rows = [una.slice(0, m), una.slice(m)]; }
+    const L = []; let top = 0;
+    rows.forEach((row, ri) => {
+      const n = row.length; if (!n) return;
+      const k = Math.min(ri ? .6 : .5, (ri ? 1.25 : 1.05) / n);          /* tamaño de cada parte */
+      const baseY = ri ? 0 : (rows[1].length ? 16 : 0);                  /* las de atrás, más arriba */
+      row.forEach((it, j) => {
+        const cx = (j + .5) * 100 / n, kk = k * (it.drink ? 1.25 : 1) * it.sub.fit;
+        it.sub.L.forEach(d => {
+          const y = baseY + d.y * kk;
+          /* el refresco lleva su id en la clave: al cambiarlo cae el nuevo */
+          L.push(Object.assign({}, d, { key: "p" + it.i + ":" + (it.drink ? it.rid + ":" : "") + d.key, x: cx + (d.x - 50) * kk, y, w: d.w * kk,
+            z: (ri ? 2000 : 0) + j * 200 + Math.round(d.z), order: it.i * 3 + d.order * .5, seq: d.seq ? it.i * 3 + d.seq : 0 }));
+          top = Math.max(top, y + d.w * kk * arOf(fileOf(d), ING[d.ing].ar) * (d.sy || 1));
+        });
+      });
+    });
+    const H = 70;
+    return { H, L, fit: Math.min(1, (H - 2) / (top || H)), shadow: { x: 50, w: 96 } };
   },
 };
 

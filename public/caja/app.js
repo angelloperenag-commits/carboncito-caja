@@ -435,11 +435,21 @@
     var nav = document.querySelectorAll("#nav button");
     for (var i = 0; i < nav.length; i++) nav[i].className = nav[i].getAttribute("data-view") === state.view ? "on" : "";
     var v = $("view");
-    if (state.view === "sell") v.innerHTML = sellHTML();
-    else if (state.view === "sales") v.innerHTML = salesHTML();
-    else if (state.view === "close") v.innerHTML = closeHTML();
-    else if (state.view === "orders") v.innerHTML = ordersHTML();
-    else v.innerHTML = settingsHTML();
+    if (state.view === "sell") pintar(v, sellHTML(), "sell:" + state.cat);
+    else if (state.view === "sales") pintar(v, salesHTML(), "sales");
+    else if (state.view === "close") pintar(v, closeHTML(), "close");
+    else if (state.view === "orders") pintar(v, ordersHTML(), "orders:" + ped.tab);
+    else pintar(v, settingsHTML(), "settings");
+  }
+  /* Redibujar con innerHTML deja cada lista hasta arriba: si se vuelve a pintar lo mismo (misma pantalla o ventana),
+     se guarda dónde iba cada parte que se desliza y se regresa ahí. Al cambiar de pantalla sí empieza arriba. */
+  var DESLIZA = [".page", ".grid", ".lines", ".m-body", ".cm-body"];
+  function pintar(el, html, clave) {
+    var antes = {}, mismo = el.getAttribute("data-pinta") === clave;
+    if (mismo) DESLIZA.forEach(function (s) { var x = el.querySelector(s); if (x) antes[s] = x.scrollTop; });
+    el.innerHTML = html;
+    el.setAttribute("data-pinta", clave);
+    if (mismo) DESLIZA.forEach(function (s) { var x = el.querySelector(s); if (x && antes[s]) x.scrollTop = antes[s]; });
   }
 
   /* tarjetas: solo foto grande y nombre. Los precios se ven en el ticket. */
@@ -989,12 +999,12 @@
 
   function renderLayer() {
     var L = $("layer");
-    if (state.qr) L.innerHTML = qrHTML();
-    else if (state.pick) L.innerHTML = pickHTML();
-    else if (state.pay) L.innerHTML = payHTML();
-    else if (state.pend) L.innerHTML = pendHTML();
-    else if (ped.open && findPed(ped.open)) L.innerHTML = comandaHTML(findPed(ped.open));
-    else L.innerHTML = "";
+    if (state.qr) pintar(L, qrHTML(), "qr");
+    else if (state.pick) pintar(L, pickHTML(), "pick:" + state.pick.pid);
+    else if (state.pay) pintar(L, payHTML(), "pay");
+    else if (state.pend) pintar(L, pendHTML(), "pend");
+    else if (ped.open && findPed(ped.open)) pintar(L, comandaHTML(findPed(ped.open)), "ped:" + ped.open);
+    else pintar(L, "", "");
   }
   function closeLayer() { state.pick = null; state.pay = null; state.pend = false; state.pendAsk = null; state.qr = null; ped.open = null; ped.ask = null; renderLayer(); }
 
@@ -1453,9 +1463,7 @@
       b.hidden = false;
     } else { b.hidden = true; }
     if (state.view === "orders" && !state.pick && !state.pay) {
-      var y = $("view").firstChild ? $("view").firstChild.scrollTop : 0;
-      render();
-      if ($("view").firstChild) $("view").firstChild.scrollTop = y;
+      render();   /* pintar() conserva dónde iba la lista */
     }
   }
 

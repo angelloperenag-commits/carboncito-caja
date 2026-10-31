@@ -1,4 +1,4 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]{display:none!important}.muertos-defs{position:absolute;overflow:hidden;pointer-events:none}.muertos-scene,.muertos-heading,.muertos-kicker{display:none}</style>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]{display:none!important}.muertos-defs{position:absolute;overflow:hidden;pointer-events:none}.muertos-scene,.muertos-heading,.muertos-kicker{display:none}.espera body{visibility:hidden}.items:empty{min-height:100vh}</style>
 <title>Menú El Carboncito</title>
 <meta name="description" content="Hamburguesas, hotdogs, salchipulpos y alitas en Temixco, Morelos. Arma tu pedido y síguelo en línea. Abierto viernes a domingo de 6 pm a 12 am.">
 <!-- que el teléfono no convierta el número en enlace azul -->
@@ -8,8 +8,13 @@
 <link rel="manifest" href="manifest-menu.webmanifest">
 <link rel="apple-touch-icon" href="caja/icon-180.png">
 <meta name="theme-color" content="#2b1a10">
-<!-- tema de temporada (lo activa la caja): se pone antes de pintar con el catálogo guardado; cargarCatalogo lo corrige -->
-<script>try{if((JSON.parse(localStorage.getItem("carbon-catalogo")||"null")||{}).tema==="muertos"){document.documentElement.classList.add("theme-muertos");document.querySelector('meta[name="theme-color"]').content="#392044"}}catch(e){}</script>
+<!-- tema de temporada (lo activa la caja): se pone antes de pintar con el catálogo guardado; cargarCatalogo lo corrige.
+     En la primera visita pide el catálogo desde aquí y espera hasta 1.5 s para no pintar la página dos veces con otro tema. -->
+<script>(function(){var h=document.documentElement,c=null;function tema(t){var on=t==="muertos";h.classList.toggle("theme-muertos",on);document.querySelector('meta[name="theme-color"]').content=on?"#392044":"#2b1a10"}
+try{c=JSON.parse(localStorage.getItem("carbon-catalogo")||"null")}catch(e){}
+if(c){tema(c.tema);return}
+h.classList.add("espera");function listo(){h.classList.remove("espera")}setTimeout(listo,1500);
+window.catalogoInicial=fetch("/api/catalogo",{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){if(d&&d.ok)tema(d.tema);listo();return d},function(){listo();return null})})()</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- las fuentes no frenan el primer dibujo: mientras llegan se ve la letra del sistema -->
@@ -1032,7 +1037,10 @@ function aplicarCatalogo(c) {
 try { aplicarCatalogo(JSON.parse(localStorage.getItem(CAT_KEY) || "null")); } catch (e) { /* sin copia guardada */ }
 /* pide el catálogo vigente; resuelve true si algo cambió */
 function cargarCatalogo() {
-  return fetch("/api/catalogo", { cache: "no-store" }).then(r => r.json()).then(c => {
+  /* la primera vez usa el que ya pidió el <head> */
+  const pedido = window.catalogoInicial || fetch("/api/catalogo", { cache: "no-store" }).then(r => r.json());
+  window.catalogoInicial = null;
+  return pedido.then(c => {
     if (!c || !c.ok || c.v === catalogoV) return false;
     aplicarCatalogo(c);
     try { localStorage.setItem(CAT_KEY, JSON.stringify(c)); } catch (e) { /* sin espacio */ }

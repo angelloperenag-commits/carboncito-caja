@@ -1,0 +1,14 @@
+{
+  "name": "El Carboncito",
+  "short_name": "El Carboncito",
+  "description": "Menú y seguimiento de pedidos de El Carboncito, Temixco",
+  "lang": "es-MX",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#2b1a10",
+  "theme_color": "#2b1a10",
+  "icons": [
+    { "src": "/caja/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/caja/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

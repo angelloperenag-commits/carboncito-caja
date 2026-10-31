@@ -13,11 +13,16 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(self), payment=(), usb=()"
     Strict-Transport-Security = "max-age=31536000"
 
 # La caja y el menú siempre en su versión más nueva
 [[headers]]
   for = "/caja/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/sw-menu.js"
   [headers.values]
     Cache-Control = "no-cache"

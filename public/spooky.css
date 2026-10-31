@@ -1,0 +1,121 @@
+/* Cartel mexicano · El Carboncito / Día de Muertos v2. */
+.theme-muertos {
+ --wall:#e8e5bd; --wall-shade:#dcd9ac; --card:#fffbed; --card-line:#39204430;
+ --ink:#392044; --ink-soft:#68556a; --terra:#a33722; --terra-dk:#812518;
+ --orange:#492650; --cream:#fffbed; --panel:#392044; --panel-2:#4c2b55;
+ --wood-1:#f2ecc9; --wood-2:#e0d9ae; --wood-3:#fff7da;
+ --tint:#39204409; --tint-2:#39204412; --sel:#ed512916;
+ --sp-ink:#392044; --sp-orange:#ed5129; --sp-paper:#f5f0cc;
+}
+.theme-muertos body {
+ min-height:100vh; border:14px solid var(--sp-ink); background-color:#e8e5bd;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='paper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .22 0 0 0 0 .13 0 0 0 0 .24 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paper)'/%3E%3C/svg%3E");
+ background-size:220px 220px;
+}
+.muertos-scene,.muertos-heading,.muertos-kicker { display:none; }
+.theme-muertos .wall,.theme-muertos .bricks,.theme-muertos .deco,.theme-muertos .rope { display:none; }
+.theme-muertos .muertos-defs { position:absolute; overflow:hidden; pointer-events:none; }
+.theme-muertos .muertos-scene { display:block; position:fixed; inset:16px; z-index:0; overflow:hidden; pointer-events:none; border:1px solid #fffbedb3; }
+.muertos-art { position:absolute; width:min(26vw,390px); height:auto; }
+.muertos-art-right { right:1.5%; top:25%; }
+.muertos-art-left { left:1%; bottom:20px; width:min(23vw,330px); }
+.muertos-edition { position:absolute; left:4%; top:7%; text-align:center; width:290px; color:var(--sp-ink); }
+.muertos-edition span,.muertos-edition i { display:block; font:700 10px var(--font-body); letter-spacing:.18em; font-style:normal; }
+.muertos-edition b { display:block; font:400 38px/1.05 var(--font-sign); letter-spacing:.02em; margin:12px 0; transform:rotate(-3deg); }
+.muertos-edition i { font-size:10px; letter-spacing:.25em; }
+.muertos-lattice { position:absolute; bottom:0; left:0; right:0; height:29px; border-top:4px solid #fffbed; background:repeating-linear-gradient(45deg,transparent 0 16px,#fffbed 16px 19px,transparent 19px 32px),repeating-linear-gradient(-45deg,transparent 0 16px,#fffbed 16px 19px,transparent 19px 32px); }
+.theme-muertos .app { max-width:500px; grid-template-columns:minmax(0,1fr); gap:18px; padding:42px 0 120px; }
+.theme-muertos .app > section,.theme-muertos .sheet > * { min-width:0; }
+.theme-muertos .sign-wrap { padding-top:60px; }
+.theme-muertos .muertos-heading { display:block; position:absolute; pointer-events:none; left:-24px; right:-24px; top:-18px; width:calc(100% + 48px); height:110px; }
+.theme-muertos .muertos-kicker { display:block; margin:0 0 8px; font:700 10px var(--font-body); letter-spacing:.24em; color:var(--sp-ink); }
+.theme-muertos .sign { padding:10px 14px 12px; border:0; border-radius:0; background:none; box-shadow:none; transform:rotate(-2deg); }
+.theme-muertos .sign::before,.theme-muertos .sign::after { display:none; }
+.theme-muertos .sign h1 { color:var(--sp-ink); font-size:44px; text-shadow:1px 2px 0 #fffbed; }
+.theme-muertos .sign .tag { color:var(--sp-ink); font-size:11px; letter-spacing:.32em; margin-top:9px; }
+.theme-muertos .sign .tag::before,.theme-muertos .sign .tag::after { background:var(--sp-orange); height:3px; width:26px; opacity:1; }
+.theme-muertos .logo-badge { width:70px; height:70px; background:var(--card); border:2px solid var(--sp-ink); box-shadow:0 0 0 4px #e8e5bd,0 0 0 5px #39204455; }
+.theme-muertos .logo-badge::before,.theme-muertos .logo-badge::after { content:""; position:absolute; top:1px; width:46px; height:62px; background:url('spooky-skull.svg') center/contain no-repeat; pointer-events:none; }
+.theme-muertos .logo-badge::before { right:calc(100% + 28px); transform:rotate(-13deg); }
+.theme-muertos .logo-badge::after { left:calc(100% + 28px); transform:rotate(13deg); }
+.theme-muertos .info { grid-template-columns:minmax(0,1fr); padding:13px 12px; gap:8px; font-size:13.5px; line-height:1.4; background:var(--sp-ink); border:13px solid var(--sp-ink); border-image:url('spooky-frame.svg') 24 / 13px / 0 round; border-radius:0; box-shadow:5px 6px 0 #39204415; }
+.theme-muertos .info p,.theme-muertos .info strong { color:var(--card); }
+.theme-muertos .info .btn { background:transparent; border-color:#fffbed80; }
+.theme-muertos .info .wa { background:#258249; border-color:#258249; }
+.theme-muertos .status { background:#fffbed18; color:#fffbed; }
+.theme-muertos .tabs { min-width:0; grid-auto-columns:minmax(58px,1fr); overflow-x:auto; scrollbar-width:none; border-radius:5px; border:2px solid var(--sp-ink); background:var(--sp-ink); box-shadow:3px 4px 0 #39204416; }
+.theme-muertos .tabs::-webkit-scrollbar { display:none; }
+.theme-muertos .tabs a { border-radius:3px; font-size:13px; }
+.theme-muertos .tabs a.on { color:var(--sp-ink); background:#f4e8bd; }
+.theme-muertos .sec-title { color:var(--sp-ink); text-shadow:none; gap:10px; font-size:29px; }
+.theme-muertos .sec-title::before,.theme-muertos .sec-title::after { width:34px; height:34px; background:url('spooky-flower.svg') center/contain no-repeat; }
+.theme-muertos .hint,.theme-muertos footer { color:#59455f; text-shadow:none; }
+.theme-muertos .item { background:#fffbed; border:1.5px solid #3920444d; border-radius:6px; box-shadow:3px 4px 0 #39204412; }
+.theme-muertos .item:hover { border-color:#ed5129; box-shadow:3px 4px 0 #ed512926; }
+.theme-muertos .add-dot { background:var(--sp-orange); }
+.theme-muertos .pay { border:1px solid #39204460; border-radius:4px; background:#fffbed; }
+.theme-muertos .desktop { width:220px; border:10px solid var(--sp-ink); border-image:url('spooky-frame.svg') 24 / 10px / 0 round; border-radius:0; padding:16px 12px; left:max(50px,calc(50% - 575px)); top:46%; background:var(--card); box-shadow:4px 6px 0 #39204418; }
+.theme-muertos .desktop h2 { font-size:20px; color:var(--sp-ink); }
+.theme-muertos .desktop p { font-size:12px; }
+.theme-muertos .qr { width:140px; height:140px; border-radius:0; margin-top:8px; }
+.theme-muertos .cartbar { border:2px solid var(--sp-ink); border-radius:7px; background:var(--sp-ink); box-shadow:0 4px 0 #ed5129,0 8px 18px #39204426; max-width:500px; }
+.theme-muertos .cb-count { background:var(--sp-orange); border:1px solid #fffbed70; }
+.theme-muertos .backdrop { background:#26162fc4; }
+/* Marco completo: rosetones en las esquinas y greca en sus cuatro lados. */
+.theme-muertos .sheet { max-width:520px; padding:16px; grid-template-columns:minmax(0,1fr); gap:14px; border:16px solid var(--sp-ink); border-image:url('spooky-frame.svg') 24 / 16px / 0 round; border-radius:0; background:var(--card); box-shadow:8px 10px 0 #170d2255,0 18px 50px #170d2233; scrollbar-color:#8b708e var(--card); }
+.theme-muertos .sheet::before { content:""; display:block; height:35px; background:url('spooky-frieze.svg') center/250px 39px repeat-x; pointer-events:none; }
+.theme-muertos .sheet-close { width:36px; height:36px; top:0; background:var(--sp-ink); color:var(--card); border-radius:3px; box-shadow:0 0 0 3px var(--card); }
+.theme-muertos .fb { margin:-14px -16px 0; top:-16px; padding:30px 16px 4px; background:#f5efd1; border-bottom:3px double var(--sp-ink); border-radius:0; }
+.theme-muertos .fb-stage { width:min(100%,calc(min(31vh,245px) * var(--ar,1.2))); }
+.theme-muertos .fb::before,.theme-muertos .fb::after { content:""; position:absolute; top:18px; bottom:8px; width:64px; pointer-events:none; background:url('spooky-corner.svg') left top/64px 160px no-repeat; }
+.theme-muertos .fb::before { left:0; }.theme-muertos .fb::after { right:0; transform:scaleX(-1); }
+.theme-muertos .fb .sheet-close { right:8px; top:8px; }
+.theme-muertos .sheet h2 { color:var(--sp-ink); }
+.theme-muertos .sheet.is-cart > h2 { color:var(--sp-ink); padding-bottom:12px; border-bottom:3px double #39204466; }
+.theme-muertos .line,.theme-muertos .seg,.theme-muertos .psum,.theme-muertos .seg-resumen,.theme-muertos .pickup,.theme-muertos .ing { border-radius:5px; }
+.theme-muertos .ing { border-color:#39204460; background:#ed512911; }
+.theme-muertos .ing.fixed,.theme-muertos .ing.off { border-color:#39204430; background:#39204409; }
+.theme-muertos .prow { border-radius:5px; }.theme-muertos .prow.on { background:#ed512914; border-color:var(--sp-orange); }
+.theme-muertos .seg-btn { border-radius:3px; }
+.theme-muertos .fields input,.theme-muertos .fields textarea { border-radius:4px; border-color:#39204466; background:#fffdf6; }
+.theme-muertos .fields input:focus,.theme-muertos .fields textarea:focus { border-color:var(--sp-ink); box-shadow:0 0 0 3px #39204416; }
+.theme-muertos .addrow { bottom:-16px; margin:0 -16px -16px; padding:12px 16px 16px; background:linear-gradient(#fffbed00,var(--card) 24%); }
+.theme-muertos .btn.add { background:var(--sp-ink); border-color:var(--sp-ink); border-radius:5px; box-shadow:0 3px 0 #ed5129; }
+.theme-muertos .stepper { border-radius:5px; background:#eee7c9; border-color:#39204440; }.theme-muertos .stepper button { border-radius:4px; }
+.theme-muertos .clabe { border-radius:4px; border-color:var(--sp-orange); }.theme-muertos .clabe b { white-space:normal; overflow-wrap:anywhere; }.theme-muertos .copy-clabe { border-radius:4px; background:var(--sp-ink); }
+.theme-muertos .done-box { padding-top:8px; }.theme-muertos .done-check { position:relative; margin-top:3px; width:64px; height:64px; }
+.theme-muertos .done-check::before,.theme-muertos .done-check::after { content:""; position:absolute; top:-7px; width:51px; height:70px; background:url('spooky-skull.svg') center/contain no-repeat; pointer-events:none; }
+.theme-muertos .done-check::before { right:calc(100% + 29px); transform:rotate(-12deg); }.theme-muertos .done-check::after { left:calc(100% + 29px); transform:rotate(12deg); }
+.theme-muertos .mi-pedido { background:var(--sp-ink); border-radius:5px; border:1px solid #fffbed99; box-shadow:0 3px 0 var(--sp-orange); }
+@media (max-width:1250px) {
+ .muertos-edition { left:2%; width:230px; }.muertos-edition b { font-size:30px; }
+ .muertos-art-right { right:-2%; width:26vw; }.muertos-art-left { left:-2%; width:23vw; }
+ .theme-muertos .desktop { left:30px; width:180px; }.theme-muertos .qr { width:126px; height:126px; }
+}
+@media (max-width:1079px) {
+ .muertos-edition { display:none; }.muertos-art-right { right:-95px; width:260px; opacity:.32; top:25%; }.muertos-art-left { left:-100px; width:240px; opacity:.32; }
+}
+@media (max-width:600px) {
+ .theme-muertos body { border-width:7px; padding-left:12px; padding-right:12px; }
+ .theme-muertos .muertos-scene { inset:8px; }.muertos-art { display:none; }.muertos-lattice { height:20px; }
+ .theme-muertos .app { gap:14px; padding-top:29px; }.theme-muertos .sign-wrap { padding-top:43px; }
+ .theme-muertos .muertos-heading { left:-12px; top:-17px; width:calc(100% + 24px); height:87px; }
+ .theme-muertos .muertos-kicker { font-size:8px; letter-spacing:.2em; margin-bottom:3px; }
+ .theme-muertos .sign { padding:8px 0; }.theme-muertos .sign h1 { font-size:clamp(27px,9.1vw,38px); }.theme-muertos .sign .tag { font-size:10px; letter-spacing:.26em; margin-top:6px; }
+ .theme-muertos .logo-badge { width:58px; height:58px; }
+ .theme-muertos .logo-badge::before,.theme-muertos .logo-badge::after { width:37px; height:50px; }
+ .theme-muertos .logo-badge::before { right:calc(100% + 23px); }.theme-muertos .logo-badge::after { left:calc(100% + 23px); }
+ .theme-muertos .info { border-width:11px; border-image-width:11px; padding:10px 9px; gap:7px; font-size:12.5px; }.theme-muertos .info .btn { font-size:12px; padding:8px 11px; min-height:42px; }
+ .theme-muertos .tabs { padding:3px; gap:2px; grid-auto-columns:minmax(54px,1fr); }.theme-muertos .tabs a { font-size:12px; letter-spacing:.02em; padding:10px 2px; }
+ .theme-muertos .sec-title { font-size:26px; gap:8px; }.theme-muertos .sec-title::before,.theme-muertos .sec-title::after { width:27px; height:27px; }.theme-muertos .hint { font-size:12px; }
+ .theme-muertos .sheet { left:6px; right:6px; bottom:6px; padding:13px; border-width:11px; border-image-width:11px; max-height:calc(100% - 35px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); }
+ .theme-muertos .sheet::before { height:28px; background-size:225px 35px; }
+ .theme-muertos .fb { margin:-10px -13px 0; top:-13px; padding:29px 13px 3px; }.theme-muertos .fb::before,.theme-muertos .fb::after { width:42px; background-size:42px 110px; top:24px; opacity:.92; }
+ .theme-muertos .fb-stage { width:min(100%,calc(min(27vh,225px) * var(--ar,1.2))); }.theme-muertos .fb .sheet-close { top:6px; right:6px; }
+ .theme-muertos .sheet h2 { font-size:29px; }.theme-muertos .sheet .lead { font-size:13px; }
+ .theme-muertos .addrow { bottom:-13px; margin:0 -13px -13px; padding:11px 13px 13px; gap:8px; }
+ .theme-muertos .stepper { grid-template-columns:38px 28px 38px; }.theme-muertos .stepper.sm { grid-template-columns:28px 22px 28px; }
+ .theme-muertos .line { grid-template-columns:44px 1fr auto; padding:8px; gap:7px; }.theme-muertos .lpic { width:44px; }
+ .theme-muertos .done-check::before { right:calc(100% + 20px); }.theme-muertos .done-check::after { left:calc(100% + 20px); }
+}
+@media (prefers-reduced-motion:reduce) { .theme-muertos .item { transition:none; } }

@@ -4,18 +4,19 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 ## Qué hay en el repositorio
 
-- `public/index.html`: menú web para clientes (celulares modernos). Constructor visual por capas con fotos WebP en `public/img/`, carrito y envío del pedido a `/api/pedidos`. Si el envío falla, ofrece WhatsApp (527771138935).
-- `public/caja/`: punto de venta para el iPad Air 1 con iOS 12.5.8 (no se puede actualizar). Vender, cobrar con cambio, ventas del turno, corte de caja, ajustes de precios, y pestaña Pedidos que recibe los pedidos del menú (consulta cada 10 s con la sesión de la caja). Se entra con usuario y contraseña.
-- `netlify/functions/pedidos.mjs` + `shared/core.mjs`: API de pedidos sobre Netlify Blobs. El servidor recalcula precios con el catálogo de `shared/core.mjs`; el precio que manda el cliente no se usa.
-- `dev/server.mjs`: servidor local con la misma API y almacén en memoria (`CAJA_PASSWORD=prueba1234 AVISOS_TOKEN=... node dev/server.mjs`; usuario `caja`).
+- `public/index.html`: menú web para clientes (celulares modernos). Constructor visual por capas con fotos WebP en `public/img/`, carrito, envío del pedido a `/api/pedidos` y sala de seguimiento del pedido. Si el envío falla (y el servidor confirma que no se guardó), ofrece WhatsApp (527771138935).
+- `public/sw-menu.js` + `public/manifest-menu.webmanifest`: service worker del menú solo para avisos push (no guarda nada en caché) y manifiesto para agregarlo a Inicio (sin `start_url`: abre la página donde se agregó, con su pedido).
+- `public/caja/`: punto de venta para el iPad Air 1 con iOS 12.5.8 (no se puede actualizar). Vender, cobrar con cambio, ventas del turno, corte de caja, Ajustes (precios, agotados y productos nuevos, guardados en el servidor), y pestaña Pedidos que recibe los pedidos del menú (consulta cada 10 s con la sesión de la caja). Se entra con usuario y contraseña.
+- `netlify/functions/pedidos.mjs` + `shared/core.mjs`: API sobre Netlify Blobs (pedidos, catálogo compartido, seguimiento del cliente, avisos push). El servidor recalcula precios con el catálogo vigente; el precio que manda el cliente no se usa.
+- `dev/server.mjs`: servidor local con la misma API y almacén en memoria (`CAJA_PASSWORD=prueba1234 node dev/server.mjs`; usuario `caja`). `dev/pruebas.mjs`: pruebas del servidor (`node dev/pruebas.mjs`).
 
 ## Reglas que no se rompen
 
 - **La caja debe funcionar en Safari de iOS 12.** Nada de: `?.`, `??`, campos de clase, WebP, `aspect-ratio`, `inset`, `gap` en flexbox (en grid usar `grid-gap` y `gap`), `clamp()`, `:is()`, `ResizeObserver`, `navigator.clipboard`, `AbortController`. JavaScript hasta ES2017. Verificar con acorn (`ecmaVersion: 2017`) y esbuild (`target: safari12`) antes de dar algo por terminado.
 - Al cambiar la caja, subir `VERSION` en `public/caja/sw.js` para que el iPad tome la versión nueva.
-- **Precios en tres lugares:** `shared/core.mjs` (manda), el menú `public/index.html` (objeto `MENU`) y la caja `public/caja/app.js` (`PRODUCTS`). Si cambian, cambiarlos en los tres.
+- **Precios:** el día a día se cambia en Caja > Ajustes y se guarda en el servidor (`catalogo/ajustes` en Blobs); el menú y la caja lo leen de `GET /api/catalogo` y el servidor cobra con eso. Los precios de fábrica siguen en tres lugares: `shared/core.mjs` (manda), el menú (`MENU`) y la caja (`PRODUCTS`). Si cambia un precio de fábrica o un producto fijo, cambiarlo en los tres.
 - Los ids de producto, de opción y los nombres de ingredientes "sin" deben coincidir entre menú, servidor y caja: así la caja puede pasar un pedido web al ticket.
-- Las ventas de la caja viven solo en el iPad (localStorage). Los pedidos web viven en Netlify Blobs. Los datos de clientes solo salen con la sesión de la caja (`CAJA_USUARIO` y `CAJA_PASSWORD`) o, para n8n, con `AVISOS_TOKEN` (variables de entorno en Netlify). `CAJA_PIN` ya no se usa.
+- Las ventas de la caja viven solo en el iPad (localStorage). Los pedidos web viven en Netlify Blobs. Los datos de clientes solo salen con la sesión de la caja (`CAJA_USUARIO` y `CAJA_PASSWORD`). El cliente solo ve su propio pedido, sin teléfono ni dirección (ver Seguimiento). `CAJA_PIN` y `AVISOS_TOKEN` ya no se usan.
 - Netlify plan gratis: cada deploy gasta unos 15 de 300 créditos al mes. Juntar cambios antes de subir a `main`.
 - **Solo código del propio sitio.** `netlify.toml` manda una CSP para todo el sitio (`script-src 'self' 'unsafe-inline'`, `connect-src 'self'`). No cargar scripts de CDNs: las librerías van en `public/js/` (qrcode-generator 1.4.4 y jsPDF 4.2.1, verificadas con el SRI de cdnjs). Google Fonts sí está permitido (solo CSS y fuentes).
 - Dependencias con versión fija en `package.json` (nada de `latest`).
@@ -26,7 +27,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - **`main`** es lo que ven los clientes (`https://elcarboncito.netlify.app`). Solo se pasa a `main` lo que ya se probó en `pruebas`, con un pull request de `pruebas` → `main`, y juntando cambios (cada deploy de producción gasta unos 15 créditos).
 - Los pedidos de pruebas viven en el almacén `pedidos-pruebas`. `netlify/functions/pedidos.mjs` lo elige con el contexto del deploy, así que nunca se mezclan con los pedidos reales (`pedidos`).
 - En pruebas, el menú y la caja muestran una franja roja "SITIO/CAJA DE PRUEBAS". Se activa en cualquier dirección con `--` (branch deploys y vistas previas) y en `localhost`.
-- `CAJA_USUARIO`, `CAJA_PASSWORD` y `AVISOS_TOKEN` pueden tener otro valor en pruebas: en Netlify, *Environment variables → la variable → Different value for each deploy context*. Cambiar `CAJA_PASSWORD` cierra todas las sesiones de la caja (necesita redeploy).
+- `CAJA_USUARIO`, `CAJA_PASSWORD`, `VAPID_PUBLIC` y `VAPID_PRIVATE` pueden (y en VAPID deben) tener otro valor en pruebas: en Netlify, *Environment variables → la variable → Different value for each deploy context*. Cambiar `CAJA_PASSWORD` cierra todas las sesiones de la caja (necesita redeploy).
 
 ## Pagos, ticket y datos del cliente
 
@@ -48,6 +49,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
   - Combo rico $200: hamburguesa hawaiana sin papas, alitas orden de 10, salchipulpos chicos y 3 hotdogs sencillos.
   - Domi combo $300: 2 hamburguesas hawaianas sin papas, alitas orden de 10, salchipulpos grandes y 3 hotdogs sencillos.
   - 1/2 Alicombo $150: 3 medias órdenes, un sabor cada una; se pueden repetir.
+  - Alicombo $300 (`alicombo`): 6 medias órdenes, una de cada sabor ya puesto (natural = receta secreta, mango habanero, piña habanero, tamarindo picante, BBQ picante, BBQ dulce). Las partes llevan `sabor` fijo: no se elige y el servidor ignora lo que mande el cliente. Es otro producto que el 1/2 Alicombo (duda registrada: confirmar con el negocio que no sustituye al de $150). Su foto de la caja (`caja/img/alicombo.png`) es provisional (copia de la del 1/2 Alicombo).
   El pedido lleva `combo: [{ sauces, off, opcion }]` por parte y el servidor regresa `componentes: [{ label, sauces, sin, opcion }]`.
 - Bebidas: Jarritos Uva, Piña, Manzana, Limón y Tamarindo de 600 ml a $25 (menú, caja y servidor). Coca-Cola de vidrio 500 ml a $25 (menú, caja y servidor). Cerveza $35: **solo en la caja** (no está en el menú ni en el servidor). Para agregar otra: `bebida(...)` en `shared/core.mjs` y en el menú, y en `PRODUCTS` de la caja con `cat: "drinks"`. Si hay menos de 5 a la venta, la sección se rellena con espacios "Próximamente" (`BEBIDA_ESPACIOS`).
 - Combos en el menú: se arman por capas con el constructor de cada parte (`COMPOSE.combo`): atrás lo alto (hamburguesas y refresco, que va más grande), adelante lo bajo (canastas y hotdogs). Cada parte usa su porción (`opt`, `piezas`). Al cambiar el refresco cae el nuevo. Las fotos de combos de la caja (`caja/img/combo-*.png`, `domi-combo.png`, `medio-alicombo.png`) se sacaron de esas mismas capas; si cambian los combos, hay que volver a generarlas.
@@ -72,10 +74,48 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Ruta de entrega: como WhatsApp no corre en el iPad con iOS 12, la caja muestra un código QR con la ruta de Google Maps para que el repartidor lo escanee con su celular. Aparece al registrar una venta a domicilio, en el detalle de la venta, en los pedidos web a domicilio (botón "Ruta (QR)") y sola al marcar un pedido web como "Ya está listo". Usa `public/js/qrcode.min.js`.
 - Cuentas por cobrar (`db.pendientes`, en el iPad): una por cliente, acumulables. "Por cobrar" guarda el ticket con el nombre del cliente o la mesa; si ya hay una cuenta con ese nombre (sin importar mayúsculas), se suma a ella y se juntan las líneas iguales. "Por cobrar (n)" muestra cada cuenta con lo que pidió, el total y a dónde llevarlo (con "Ruta (QR)"). Con un ticket abierto, la lista ofrece "Sumar ticket actual" a cualquier cuenta. Sirve para quien come en el local y para quien llega en coche y pide que se lo lleven a su casa. No cuentan en el corte hasta cobrarlas, y el corte avisa si hay alguna.
 
+## Catálogo compartido y productos nuevos
+
+- `catalogo/ajustes` en Blobs: `{ v, precios: { id: [precio por opción] }, agotado: { id: true }, extra: [productos nuevos] }`. `catalogoCon()` lo junta con `CATALOG`. Solo la caja (con sesión) lo cambia (`POST /api/catalogo`); "Guardado" se avisa hasta que el servidor responde.
+- El menú guarda una copia (`carbon-catalogo`) para pintar rápido y pide la vigente al abrir y al volver a la pestaña. Si un precio cambió con el carrito abierto, el servidor responde 409 con el total nuevo (`totalVisto` ≠ total) y el menú pide confirmarlo antes de crear el pedido. Cada pedido guarda nombre, precio y cantidad de cada línea: los cambios de catálogo no tocan pedidos anteriores.
+- Productos nuevos (ids `x-…`): nombre, descripción, precio, categoría, foto y disponibilidad desde Caja > Ajustes. No se borran: se desactivan (si la caja los omite, el servidor los conserva desactivados). La foto se achica en el iPad (canvas, 800 px) y se sube a `POST /api/catalogo/img`; el servidor revisa que sea PNG o JPEG de verdad (bytes del encabezado), ≤ 400 KB y ≤ 1600 px, y la sirve en `/api/img/<id>` con `nosniff`. En el menú se dibujan con el constructor de bebidas (su foto, o su nombre si no tiene).
+- La cerveza (solo caja) guarda su precio y agotado en el iPad (`SOLO_CAJA`).
+- Tema de temporada: `tema` en `catalogo/ajustes` (`"muertos"` o vacío). Se prende y apaga en Caja > Ajustes > Tema del menú web; una caja vieja que no manda `tema` no lo cambia. El menú pone la clase `theme-muertos` en `<html>` antes de pintar (script en el `<head>` con la copia `carbon-catalogo`) y la corrige al llegar el catálogo. El diseño (de Codex) está en `public/spooky.css` y `public/spooky-*.svg`, más los bloques `muertos-*` del HTML; sin la clase quedan ocultos. La caja no cambia de aspecto.
+
+## Estados del pedido, seguimiento y avisos
+
+- Estados: `nuevo` (Pendiente de aceptación) → `aceptado` → `preparando` → `listo` → `entregado`, y `rechazado` (Cancelado) desde cualquiera sin terminar. `PASOS` en `shared/core.mjs` dice qué cambios valen; solo la caja los hace.
+- Seguimiento: al mandar el pedido el servidor pone una cookie de invitado (`cbx_invitado`, aleatoria, HttpOnly, Secure, SameSite=Lax) y guarda en el pedido el hash de esa cookie. `GET /api/seguimiento?p=<clave>` solo responde a esa cookie o al token del enlace (`x-seguimiento`, HMAC con vencimiento de 48 h). Nunca se usa la IP como identidad. La vista del cliente no trae teléfono, dirección ni correo.
+- El menú abre la sala en `/?pedido=<clave>&t=<token>` (así sobrevive a recargar y a "Agregar a inicio"), pregunta cada 20 s solo con la página a la vista y deja de preguntar al entregar o cancelar. Si el envío no tuvo respuesta, antes de ofrecer WhatsApp pregunta `GET /api/seguimiento` para no duplicar el pedido.
+- Avisos push (opcionales): botón "Activar notificaciones de mi pedido"; el permiso se pide solo al tocarlo. La suscripción queda ligada a ese pedido (`push/<id>/<hash>`, hasta 5) y solo se aceptan servicios de push conocidos (`PUSH_HOSTS`). El servidor manda un aviso vacío firmado con VAPID (ES256 con WebCrypto, sin librerías) y el service worker pregunta el estado real. Primero se guarda el pedido o el cambio de estado y después se avisa; un aviso fallido nunca rompe nada. Deduplicación por pedido/estado/teléfono (`notif/…`), 3 intentos como máximo (los reintentos van con la consulta de la caja, a lo más una vez por minuto), 404/410 borra la suscripción, y al entregar o cancelar se borran sus suscripciones y registros.
+- Variables: `VAPID_PUBLIC` y `VAPID_PRIVATE` (sin ellas el botón dice que los avisos no están listos y el seguimiento sigue igual). Un par distinto para pruebas y para producción.
+- WhatsApp y n8n ya no forman parte del flujo de pedidos (se quitaron `/api/avisos`, `aviso/…`, `AVISOS_TOKEN` y `n8n/`). Siguen los enlaces que el cliente toca él mismo: mandar captura de transferencia y el respaldo si el pedido no se pudo enviar. El Docker de n8n/Evolution en la PC de la casa no se tocó; se puede apagar.
+
+## Promos del día
+
+- Se crean en Caja › Ajustes › Promos del día y se guardan en `promos/config` (Blobs): productos (solo los que se sirven como vienen: nada de sabores de alitas ni refresco por elegir), precio, duración (5 min a 24 h; la hora de inicio y fin la pone el servidor), nombre opcional ("Oferta flash" si va vacío) y dinámica: `primeros` (los primeros N clientes), `primero` (el primero que la pida) o `reto` (instrucciones para el local, por ejemplo "el primero que llegue disfrazado de catrín"). Los retos se guardan para reusarlos (`dinamicas`).
+- `GET /api/promos` da las vigentes al menú (con `ahora` del servidor para el contador); con la sesión de la caja da también las de las últimas 24 h y los retos. `POST /api/promos` (caja) guarda; `POST /api/promos/usar` aparta lugares por ventas de la caja.
+- El menú las muestra como alerta fija abajo (abierta la primera vez, luego pastilla) con contador. Las de `primeros`/`primero` se piden en línea, una por pedido, al precio de la oferta; los lugares se cuentan con `promo-uso/<id>/…` (pedidos web y ventas de la caja). Los retos no se piden en línea: se cobran en la caja, pestaña Promos. Dos pedidos en el mismo instante podrían pasarse por uno del cupo (no hay transacciones en Blobs).
+
+## Rendimiento del menú
+
+- La lista usa iconos ya hechos (`img/mini/<id>.webp`, ~10 KB cada uno), sacados de las mismas capas del constructor. Si cambia cómo se ve un producto o se agrega uno fijo, hay que volver a generarlos (Edge sin ventana: armar el icono con las capas y guardarlo como WebP a 252×210). Los productos nuevos de la caja usan su foto.
+- Las fotos de las capas se piden hasta que el cliente toca, desliza o escribe (y las del producto que toca, primero). jsPDF se carga solo si el cliente pide su ticket en PDF; qrcode-generator solo en computadora. Las fuentes de Google no frenan el primer dibujo.
+- PageSpeed (móvil) de producción, 31 oct 2026, antes de esto: 99. El sitio de pruebas no se puede medir con PageSpeed porque es privado (mide la página de login de Netlify).
+
+## Ubicación de entrega
+
+- En "Tu pedido" (domicilio): dirección escrita, número interior y referencias; "Usar mi ubicación" (GPS con permiso; se muestra el punto para revisarlo en Maps y se puede quitar) y un campo para pegar el enlace de Google Maps. Basta cualquiera de los tres. "Buscar en Google Maps" abre una búsqueda (`api=1`) en otra pestaña; el carrito no se pierde.
+- El servidor guarda `cliente.ubicacion` (lat/lng dentro de México, redondeadas) y `cliente.mapa` (solo https de Google Maps). Nunca visita esos enlaces. La caja muestra el punto y la ruta (QR) va al punto GPS si lo hay.
+- No hay buscador integrado: Google Places cobra (necesita facturación) y Nominatim público no se permite para autocompletar. `Permissions-Policy` permite `geolocation=(self)`.
+
 ## Pendiente
 
-- Probar la caja en el iPad real: el sitio de pruebas es privado y el inicio de sesión de Netlify no carga en iOS 12, así que el iPad solo puede abrir la caja de producción.
-- Revisar `public/caja/app.js` con acorn (ES2017) y esbuild (`safari12`): la caja v7 (domicilio, cuentas por cobrar) se escribió en ES5 a mano, pero no se pudo correr Node en la computadora donde se hizo. Se probó en Chromium a tamaño de iPad, no en el iPad real.
+- Probar la caja en el iPad real (orientaciones, teclado, zoom): el sitio de pruebas es privado y el inicio de sesión de Netlify no carga en iOS 12, así que el iPad solo puede abrir la caja de producción. La causa probable del ticket (altura `100%` dentro de un hijo flex, que Safari de iOS 12 no resuelve) se corrigió anclando la venta con `position: absolute`, pero solo se comprobó en Chromium.
+- Probar avisos push en teléfonos reales (Android Chrome/Edge, iPhone con la web agregada a Inicio) con `VAPID_*` puestas en pruebas.
+- Animaciones en Edge de Android: sin dispositivo no se confirmó la causa. Defensas: `anim()` termina cualquier animación que se quede parada y no deja capas escondidas si `animate()` falla; `decode()` tiene tiempo límite. Comprobar en un Android real.
+- Folio: se calcula contando los pedidos del día; dos pedidos en el mismo instante podrían repetir folio (raro). La clave del pedido sí es única.
+- Foto definitiva del Alicombo para la caja (`caja/img/alicombo.png`).
 - frakOs (sistema propio para equipos viejos) es investigación a largo plazo, fuera de este repositorio.
 
 ## Entrada a la caja
@@ -83,16 +123,14 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - La caja pide usuario y contraseña al abrir (`/api/caja/login`, contra `CAJA_USUARIO` —por defecto `caja`— y `CAJA_PASSWORD`). El servidor da una sesión firmada (`vence.firma`, HMAC con usuario y contraseña) que dura 30 días; la caja la guarda en `localStorage` (`carbon-caja-sesion`, fuera del respaldo) y la manda como `Authorization: Bearer`. Sin internet sigue vendiendo con la sesión guardada.
 - 5 intentos fallidos desde la misma conexión bloquean 15 minutos (`intentos/…` con hash de la IP).
 
-## Avisos por WhatsApp (n8n)
+## Caja: iPad, orientación y zoom
 
-- n8n, Evolution API (WhatsApp vinculado como dispositivo, no la API oficial), PostgreSQL y Redis corren en Docker en la PC de la casa: `G:\Documentos\ChatGPT\RLoperena 2\carboncito-whatsapp` (proyecto `carboncito-whatsapp`, n8n en `http://localhost:5678`). Sus claves están en ese `.env` y en `bootstrap/` (no se suben a ningún lado).
-- Netlify no puede llamar a la PC, así que n8n pregunta: al aceptar, marcar listo o rechazar un pedido web, el servidor deja un aviso en `aviso/…`; el flujo `Carboncito · Avisos de pedidos` (`n8n/carboncito-pedidos.json`) lee `GET /api/avisos` con la cabecera `x-avisos-token`, manda el texto por Evolution y borra el aviso con `POST /api/avisos/ok`. Corre cada 30 s de viernes a domingo, 5 pm a 1 am. Si falla se reintenta; pasada 1 hora se descarta.
-- El sitio de pruebas es privado (Netlify pide iniciar sesión), así que n8n solo puede leer producción.
-- La PC debe estar encendida y con internet para que salgan los mensajes; si no, los pedidos siguen llegando a la caja igual.
+- La venta y las páginas se anclan a los bordes de `.view` con `position: absolute` (Safari de iOS 12 no resuelve `height: 100%` dentro de un hijo flex). En horizontal: catálogo y ticket en columnas, lista con scroll y Total/Cobrar abajo. En vertical (≤ 820 px): "Ver ticket (n) · $" abajo abre el ticket completo (también vacío) y "‹ Productos" regresa; girar no borra el ticket porque solo cambia el CSS.
+- Zoom: `touch-action: pan-x pan-y` en `html` (Chrome/Edge) y `gesturestart`/`gesturechange` con `preventDefault` (Safari de iOS, que ignora `user-scalable`). Todos los campos a 16 px o más para que iOS no haga zoom al enfocarlos. Lo mismo en el menú.
 
 ## Seguridad (revisión antes de pasar a producción)
 
 - El servidor solo acepta claves propias de sus catálogos (`own()` en `shared/core.mjs`): "constructor" o "__proto__" no cuentan como producto, sabor, entrega, pago ni ticket. Las cantidades de alitas deben ser enteros.
 - Todo lo que viene del cliente se pinta con `esc()` en la caja y en el menú. La CSP del sitio no cambió y no hay scripts externos.
-- Los avisos para n8n de más de un día se borran solos al leer la cola, para no guardar teléfonos de más.
-- Ninguna llave real está en el repositorio ni en su historial (las de n8n y Evolution viven solo en la PC de la casa).
+- Las respuestas de la API van con `cache-control: no-store, private`; el service worker de la caja no guarda nada de `/api/` (salvo fotos de productos) y el del menú no tiene `fetch`.
+- Ninguna llave real está en el repositorio ni en su historial. Las claves VAPID de pruebas están solo en la PC (`Documentos\carboncito-vapid-pruebas.txt`) y en Netlify.

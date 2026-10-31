@@ -145,7 +145,7 @@
   var SOLO_CAJA = { cerveza: 1 };
   if (!db.catalogo) db.catalogo = { v: 0, precios: {}, agotado: {}, extra: [] };
   function aplicarCatalogo(c) {
-    db.catalogo = { v: c.v || 0, precios: c.precios || {}, agotado: c.agotado || {}, extra: c.extra || [] };
+    db.catalogo = { v: c.v || 0, precios: c.precios || {}, agotado: c.agotado || {}, extra: c.extra || [], tema: c.tema || "" };
     PRODUCTS = PRODUCTS.filter(function (p) { return !p.extra; });
     /* los productos nuevos desactivados se quedan (los pedidos viejos los nombran), pero no se venden */
     db.catalogo.extra.forEach(function (x) {
@@ -172,7 +172,7 @@
     var c = JSON.parse(JSON.stringify(db.catalogo));
     cambiar(c);
     toast("Guardando…");
-    return api("POST", "/api/catalogo", { precios: c.precios, agotado: c.agotado, extra: c.extra }).then(function (d) {
+    return api("POST", "/api/catalogo", { precios: c.precios, agotado: c.agotado, extra: c.extra, tema: c.tema || "" }).then(function (d) {
       aplicarCatalogo(d); save(); toast(ok);
       var a = document.activeElement;
       if (!(a && a.getAttribute && a.getAttribute("data-price"))) render();
@@ -838,6 +838,9 @@
       "<h3>Precios y disponibilidad</h3>" +
       '<div class="card prices"><table><tr><th>Producto</th><th class="r">Precio</th><th class="r"></th></tr>' + rows + "</table>" +
       '<p class="note">Se guarda al salir de cada casilla y cambia también en el menú web (hace falta internet). La cerveza es solo de la caja: se guarda en este iPad.</p></div>' +
+      "<h3>Tema del menú web</h3>" +
+      '<div class="card"><button type="button" class="chk' + (db.catalogo.tema === "muertos" ? " on" : "") + '" data-act="tema">' + (db.catalogo.tema === "muertos" ? "Día de Muertos activado" : "Día de Muertos desactivado") + "</button>" +
+      '<p class="note">Cambia cómo se ve el menú para los clientes (hace falta internet). La caja se ve igual.</p></div>' +
       "<h3>Promos del día</h3>" + promosHTML() +
       "<h3>Productos nuevos</h3>" + productosHTML() +
       "<h3>Pedidos del menú web</h3>" +
@@ -1067,6 +1070,7 @@
     if ((el = find(t, "[data-ptab]"))) { ped.tab = attr(el, "data-ptab"); return render(); }
     if (find(t, '[data-act="show-login"]')) return showLogin();
     if (find(t, '[data-act="logout"]')) return logout();
+    if (find(t, '[data-act="tema"]')) { var tema = db.catalogo.tema === "muertos" ? "" : "muertos"; return guardarCatalogo(function (c) { c.tema = tema; }, tema ? "Tema de Día de Muertos activado" : "Tema de Día de Muertos desactivado").catch(function () {}); }
     if (find(t, '[data-act="mute"]')) { db.settings.mute = !db.settings.mute; save(); if (!db.settings.mute) beep(); return render(); }
 
     /* ventana de opciones */

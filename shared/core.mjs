@@ -313,7 +313,7 @@ const CATS = ["burgers", "snacks", "wings", "combos", "drinks"];
 const ID_EXTRA = /^x-[a-z0-9-]{2,36}$/, ID_FOTO = /^x-[a-z0-9-]{2,36}-\d{13}$/;
 const precio = (v) => { const n = Number(v); return Number.isInteger(n) && n >= 1 && n <= 5000 ? n : null; };
 export async function leerAjustes(store) {
-  return (await store.get(AJUSTES, { type: "json" })) || { v: 0, precios: {}, agotado: {}, extra: [] };
+  return (await store.get(AJUSTES, { type: "json" })) || { v: 0, precios: {}, agotado: {}, extra: [], tema: "" };
 }
 /* catálogo vigente: el del código con los precios y la disponibilidad de la caja, más los productos nuevos */
 export function catalogoCon(aj) {
@@ -351,9 +351,11 @@ function limpiarAjustes(b, prev) {
   });
   /* un producto nuevo nunca se borra: si no viene, se conserva desactivado (los pedidos viejos lo siguen nombrando) */
   (prev.extra || []).forEach((x) => { if (!ids.has(x.id)) extra.push(Object.assign({}, x, { disponible: false })); });
-  return { precios, agotado, extra };
+  /* tema de temporada del menú; una caja vieja que no lo manda no lo apaga */
+  const tema = own(b, "tema") ? (b.tema === "muertos" ? "muertos" : "") : prev.tema || "";
+  return { precios, agotado, extra, tema };
 }
-const ajustesPublicos = (aj) => ({ v: aj.v || 0, precios: aj.precios || {}, agotado: aj.agotado || {}, extra: aj.extra || [] });
+const ajustesPublicos = (aj) => ({ v: aj.v || 0, precios: aj.precios || {}, agotado: aj.agotado || {}, extra: aj.extra || [], tema: aj.tema || "" });
 
 /* fotos de productos nuevos: JPEG o PNG, hasta 400 KB y 1600 px por lado (la caja las achica antes de subirlas) */
 function medidasImagen(b) {

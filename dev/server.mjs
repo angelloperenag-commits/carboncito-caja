@@ -15,7 +15,7 @@ const store = {
 };
 /* CAJA_PASSWORD=prueba1234 node dev/server.mjs  (VAPID_PUBLIC y VAPID_PRIVATE para probar notificaciones) */
 const CFG = { usuario: process.env.CAJA_USUARIO || "caja", password: process.env.CAJA_PASSWORD || "prueba1234", vapidPublic: process.env.VAPID_PUBLIC || "", vapidPrivate: process.env.VAPID_PRIVATE || "", secure: false };
-const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".png": "image/png", ".webp": "image/webp", ".json": "application/json", ".webmanifest": "application/manifest+json" };
+const types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");

@@ -65,6 +65,11 @@
     combo("medio-alicombo", "1/2 Alicombo", "Tres medias órdenes de alitas, un sabor en cada una", 150, [
       part("alitas", "Media orden 1", { unSabor: true }), part("alitas", "Media orden 2", { unSabor: true }), part("alitas", "Media orden 3", { unSabor: true })
     ], { repetidos: true, img: "medio-alicombo" }),
+    /* Alicombo: 6 medias órdenes, una de cada sabor ya puesto (no se elige). Es otro producto que el 1/2 Alicombo. */
+    combo("alicombo", "Alicombo", "1/2 natural, 1/2 mango habanero, 1/2 piña habanero, 1/2 tamarindo picante, 1/2 BBQ picante y 1/2 BBQ dulce", 300,
+      [["Receta secreta sin salsa", "natural"], ["Mango habanero", "mango habanero"], ["Piña habanero", "piña habanero"], ["Tamarindo picante", "tamarindo picante"], ["BBQ picante", "BBQ picante"], ["BBQ dulce", "BBQ dulce"]].map(function (x) {
+        return part("alitas", "1/2 " + x[1], { opt: 1, piezas: 5, sabor: x[0] });
+      }), { img: "alicombo" }),
     /* bebidas: mismo id que el menú y el servidor. La cerveza es solo de la caja. */
     { id: "jarritos-uva", cat: "drinks", name: "Jarritos Uva", desc: "Refresco de 600 ml", img: "jarritos-uva-600ml", opts: [["600 ml", 25]], quitar: [] },
     { id: "jarritos-pina", cat: "drinks", name: "Jarritos Piña", desc: "Refresco de 600 ml", img: "jarritos-pina-600ml", opts: [["600 ml", 25]], quitar: [] },
@@ -76,7 +81,7 @@
   ];
   /* Bebidas se queda aunque esté vacía, para que se vea dónde van a ir */
   CATS = CATS.filter(function (c) { return c.id === "drinks" || PRODUCTS.some(function (p) { return p.cat === c.id; }); });
-  function imgOf(p) { var f = p.img == null ? p.id : p.img; return f ? '<img src="img/' + f + '.png" alt="">' : ""; }
+  function imgOf(p) { if (p.foto) return '<img src="' + esc(p.foto) + '" alt="">'; if (p.extra) return ""; var f = p.img == null ? p.id : p.img; return f ? '<img src="img/' + f + '.png" alt="">' : ""; }
   /* se puede vender: no es borrador, está disponible y todas sus opciones tienen precio */
   function sellable(p) { return !p.draft && p.disponible !== false && p.opts.every(function (o) { return typeof o[1] === "number"; }); }
   /* lo que falta para poder vender un borrador */
@@ -133,6 +138,50 @@
   if (!canSave) document.getElementById("warn").hidden = false;
 
   /* =========================================================
+     CATÁLOGO COMPARTIDO con el menú web (/api/catalogo): precios, agotados y productos nuevos.
+     El servidor manda; aquí queda una copia para seguir vendiendo sin internet.
+     La cerveza es solo de la caja: su precio y si está agotada se quedan en este iPad.
+     ========================================================= */
+  var SOLO_CAJA = { cerveza: 1 };
+  if (!db.catalogo) db.catalogo = { v: 0, precios: {}, agotado: {}, extra: [] };
+  function aplicarCatalogo(c) {
+    db.catalogo = { v: c.v || 0, precios: c.precios || {}, agotado: c.agotado || {}, extra: c.extra || [] };
+    PRODUCTS = PRODUCTS.filter(function (p) { return !p.extra; });
+    /* los productos nuevos desactivados se quedan (los pedidos viejos los nombran), pero no se venden */
+    db.catalogo.extra.forEach(function (x) {
+      PRODUCTS.push({ id: x.id, cat: x.cat, name: x.name, desc: x.desc, opts: [["", x.price]], quitar: [], foto: x.img, extra: true, disponible: x.disponible !== false });
+    });
+  }
+  aplicarCatalogo(db.catalogo);
+  function agotado(id) { return SOLO_CAJA[id] ? !!db.settings.soldOut[id] : !!db.catalogo.agotado[id]; }
+  var catPidiendo = false;
+  function cargarCatalogo() {
+    if (catPidiendo) return;
+    catPidiendo = true;
+    withTimeout(fetch("/api/catalogo", { cache: "no-store" }), 12000).then(function (r) { return r.json(); }).then(function (d) {
+      catPidiendo = false;
+      if (!d || !d.ok || d.v === db.catalogo.v) return;
+      aplicarCatalogo(d); save();
+      /* sin interrumpir a quien está escribiendo en Ajustes */
+      var a = document.activeElement;
+      if (!(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && state.view === "settings")) render();
+    }).catch(function () { catPidiendo = false; });
+  }
+  /* guarda en el servidor; "Guardado" solo se avisa cuando el servidor lo confirma */
+  function guardarCatalogo(cambiar, ok) {
+    var c = JSON.parse(JSON.stringify(db.catalogo));
+    cambiar(c);
+    toast("Guardando…");
+    return api("POST", "/api/catalogo", { precios: c.precios, agotado: c.agotado, extra: c.extra }).then(function (d) {
+      aplicarCatalogo(d); save(); toast(ok);
+      var a = document.activeElement;
+      if (!(a && a.getAttribute && a.getAttribute("data-price"))) render();
+    }).catch(function (e) {
+      render(); toast("No se guardó: " + (e.message === "tiempo" || /fetch|network|load/i.test(e.message) ? "sin conexión, vuelve a intentarlo" : e.message)); throw e;
+    });
+  }
+
+  /* =========================================================
      UTILIDADES
      ========================================================= */
   function $(id) { return document.getElementById(id); }
@@ -152,6 +201,8 @@
   }
   function prod(id) { for (var i = 0; i < PRODUCTS.length; i++) if (PRODUCTS[i].id === id) return PRODUCTS[i]; return null; }
   function price(p, opt) {
+    var c = db.catalogo.precios[p.id];
+    if (!SOLO_CAJA[p.id]) return c && typeof c[opt] === "number" ? c[opt] : p.opts[opt][1];
     var o = db.settings.prices[p.id];
     if (o && o[opt] != null && o[opt] !== "") return Number(o[opt]);
     return p.opts[opt][1];
@@ -196,7 +247,12 @@
   }
   function buscarURL(dir) { return mapsLink(dir) || "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(lugar(dir)); }
   function rutaURL(dir) { return mapsLink(dir) || "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(lugar(dir)); }
-  function openRuta(title, dir, extra) { state.qr = { title: title, dir: dir, extra: extra || "", url: rutaURL(dir) }; renderLayer(); }
+  function openRuta(title, dir, extra, url) { state.qr = { title: title, dir: dir, extra: extra || "", url: url || rutaURL(dir) }; renderLayer(); }
+  /* destino de un pedido web: el punto que confirmó el cliente, su enlace de Maps o la dirección escrita */
+  function puntoURL(c, ruta) {
+    if (c.ubicacion) return "https://www.google.com/maps/" + (ruta ? "dir/?api=1&destination=" : "search/?api=1&query=") + encodeURIComponent(c.ubicacion.lat + "," + c.ubicacion.lng);
+    return c.mapa || (ruta ? rutaURL(c.direccion) : buscarURL(c.direccion));
+  }
   function qrSVG(text) {
     if (typeof window.qrcode !== "function") return "";
     try { var q = window.qrcode(0, "M"); q.addData(text); q.make(); return q.createSvgTag(6, 4); } catch (e) { return ""; }
@@ -391,7 +447,7 @@
     var tiles;
     if (state.cat === "wings") {
       /* alitas: un botón por sabor */
-      var agotadas = db.settings.soldOut.alitas;
+      var agotadas = agotado("alitas");
       tiles = SAUCES.map(function (n) {
         return '<button type="button" class="tile sabor' + (agotadas ? " out" : "") + '" data-sabor="' + esc(n) + '" style="border-bottom-color:' + TONO[n] + '">' +
           '<img src="img/alitas-' + SLUG[n] + '-10.png" alt=""><b>' + esc(n) + "</b></button>";
@@ -399,15 +455,15 @@
         /* para pedidos con varios sabores: se reparten las alitas con un contador */
         '<button type="button" class="tile sabor perso' + (agotadas ? " out" : "") + '" data-act="alas-perso"><img src="img/alitas.png" alt=""><b>Alitas personalizadas</b></button>';
     } else {
-      tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat && !p.hidden; }).map(function (p) {
-        var out = db.settings.soldOut[p.id] || p.disponible === false, draft = !sellable(p) && p.disponible !== false;
+      tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat && !p.hidden && !(p.extra && p.disponible === false); }).map(function (p) {
+        var out = agotado(p.id) || p.disponible === false, draft = !sellable(p) && p.disponible !== false;
         return '<button type="button" class="tile' + (draft ? " draft" : out ? " out" : "") + '" data-add="' + p.id + '">' + imgOf(p) +
           "<b>" + esc(p.tile || p.name) + "</b></button>";
       }).join("");
     }
     if (state.cat === "drinks") {
       /* espacios "Próximamente" hasta completar BEBIDA_ESPACIOS; las bebidas reales los van ocupando */
-      var hay = PRODUCTS.filter(function (p) { return p.cat === "drinks" && !p.hidden; }).length;
+      var hay = PRODUCTS.filter(function (p) { return p.cat === "drinks" && !p.hidden && !(p.extra && p.disponible === false); }).length;
       for (var b = hay; b < BEBIDA_ESPACIOS; b++) tiles += '<div class="tile slot"><span class="slot-pic"></span><b>Próximamente</b><small>Bebida por confirmar</small></div>';
     }
     if (!tiles) tiles = '<p class="empty">No hay productos en esta sección.</p>';
@@ -416,7 +472,7 @@
     var n = cartCount(), t = cartTotal();
     return '<div class="sell' + (state.showTicket ? " show-ticket" : "") + '">' +
       '<div class="catalog"><div class="cats">' + cats + '</div><div class="grid">' + tiles + "</div>" +
-      '<div class="mini-bar"><button type="button" class="btn" data-act="show-ticket"' + (n ? "" : " disabled") + ">Ver ticket (" + n + ") · " + money(t) + "</button></div></div>" +
+      '<div class="mini-bar"><button type="button" class="btn' + (n ? "" : " ghost") + '" data-act="show-ticket">Ver ticket (' + n + ") · " + money(t) + "</button></div></div>" +
       '<aside class="ticket">' + ticketHTML() + "</aside></div>";
   }
   function ticketHTML() {
@@ -545,8 +601,77 @@
       "</div></div>";
   }
 
+  /* productos nuevos (se crean aquí y salen también en el menú web) */
+  function catNombre(id) { for (var i = 0; i < CATS.length; i++) if (CATS[i].id === id) return CATS[i].name; return id; }
+  function productosHTML() {
+    var f = state.prodForm;
+    var lista = db.catalogo.extra.map(function (x) {
+      return '<div class="px' + (x.disponible === false ? " off" : "") + '">' + (x.img ? '<img src="' + esc(x.img) + '" alt="">' : '<span class="px-sin"></span>') +
+        "<div><b>" + esc(x.name) + "</b><small>" + esc(catNombre(x.cat)) + " · " + money(x.price) + (x.disponible === false ? " · Desactivado" : "") + "</small></div>" +
+        '<button type="button" class="btn ghost" data-pedit="' + esc(x.id) + '">Editar</button></div>';
+    }).join("");
+    var form = !f ? '<button type="button" class="btn dark" data-act="prod-new">Agregar producto</button>' :
+      '<div class="pform"><h4>' + (f.id ? "Editar producto" : "Producto nuevo") + "</h4>" +
+      '<label class="field"><span>Nombre</span><input id="pf-name" type="text" maxlength="40" value="' + esc(f.name) + '"></label>' +
+      '<label class="field"><span>Descripción</span><input id="pf-desc" type="text" maxlength="140" value="' + esc(f.desc) + '"></label>' +
+      '<div class="row2"><label class="field"><span>Precio</span><input id="pf-price" type="number" inputmode="numeric" min="1" max="5000" value="' + esc(f.price) + '"></label>' +
+      '<label class="field"><span>Categoría</span><select id="pf-cat">' + CATS.map(function (c) { return '<option value="' + c.id + '"' + (f.cat === c.id ? " selected" : "") + ">" + esc(c.name) + "</option>"; }).join("") + "</select></label></div>" +
+      '<div class="pf-foto">' + (f.foto || f.img ? '<img src="' + esc(f.foto || f.img) + '" alt="">' : '<span class="px-sin"></span>') +
+      '<label class="btn ghost pf-pick">' + (f.foto || f.img ? "Cambiar foto" : "Elegir foto") + '<input id="pf-file" class="pf-file" type="file" accept="image/*"></label></div>' +
+      '<p class="note">JPG o PNG. Se achica sola a 800 px antes de subirla (máximo 400 KB). Sin foto se muestra solo el nombre.</p>' +
+      '<button type="button" class="chk' + (f.disponible ? "" : " on") + '" data-act="prod-toggle">' + (f.disponible ? "Disponible" : "Desactivado: no se vende") + "</button>" +
+      '<p class="l-err"' + (f.err ? "" : " hidden") + ">" + esc(f.err || "") + "</p>" +
+      '<div class="row2"><button type="button" class="btn ghost" data-act="prod-cancel">Cancelar</button><button type="button" class="btn" data-act="prod-save"' + (f.busy ? " disabled" : "") + ">" + (f.busy ? "Guardando…" : "Guardar") + "</button></div></div>";
+    return '<div class="card prods">' + (lista || '<p class="note">Todavía no hay productos nuevos.</p>') + form +
+      '<p class="note">Salen en la caja y en el menú web. No se borran: se desactivan, para que los pedidos anteriores los sigan nombrando.</p></div>';
+  }
+  function slug(s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 20) || "producto"; }
+  /* la foto se achica en el iPad (canvas) y se sube como PNG (si tiene transparencia y cabe) o JPG */
+  var FOTO_MAX = 390 * 1024;
+  function achicarFoto(file) {
+    var f = state.prodForm;
+    if (!/^image\//.test(file.type || "image/")) { f.err = "Ese archivo no es una foto."; return render(); }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var im = new Image();
+      im.onload = function () {
+        var k = Math.min(1, 800 / Math.max(im.width, im.height)), w = Math.max(1, Math.round(im.width * k)), h = Math.max(1, Math.round(im.height * k));
+        var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        var cx = cv.getContext("2d"), url = "";
+        cx.drawImage(im, 0, 0, w, h);
+        if (file.type === "image/png") url = cv.toDataURL("image/png");
+        if (!url || url.length * 0.75 > FOTO_MAX) {
+          cx.fillStyle = "#fff"; cx.fillRect(0, 0, w, h); cx.drawImage(im, 0, 0, w, h);
+          for (var q = 0.85; q > 0.35; q -= 0.1) { url = cv.toDataURL("image/jpeg", q); if (url.length * 0.75 <= FOTO_MAX) break; }
+        }
+        if (url.length * 0.75 > FOTO_MAX) { f.err = "No se pudo achicar la foto."; return render(); }
+        f.foto = url; f.err = ""; render();
+      };
+      im.onerror = function () { f.err = "No se pudo leer la foto."; render(); };
+      im.src = rd.result;
+    };
+    rd.onerror = function () { f.err = "No se pudo leer la foto."; render(); };
+    rd.readAsDataURL(file);
+  }
+  function guardarProducto() {
+    var f = state.prodForm; if (!f || f.busy) return;
+    var precio = Number(f.price);
+    if (!String(f.name).trim()) { f.err = "Falta el nombre."; return render(); }
+    if (!(precio >= 1 && precio <= 5000 && Math.round(precio) === precio)) { f.err = "El precio debe ser un número entero de 1 a 5000."; return render(); }
+    var id = f.id || ("x-" + slug(f.name) + "-" + Date.now().toString(36).slice(-5));
+    f.busy = true; f.err = ""; render();
+    var subir = f.foto ? api("POST", "/api/catalogo/img", { id: id, foto: f.foto }).then(function (d) { return d.img; }) : Promise.resolve(f.img);
+    subir.then(function (img) {
+      var x = { id: id, name: String(f.name).trim(), desc: String(f.desc).trim(), price: precio, cat: f.cat, img: img || "", disponible: f.disponible };
+      f.img = img || ""; f.foto = "";
+      return guardarCatalogo(function (c) {
+        var i = -1; c.extra.forEach(function (e, k) { if (e.id === id) i = k; });
+        if (i >= 0) c.extra[i] = x; else c.extra.push(x);
+      }, x.disponible ? "Producto guardado: ya sale en el menú web" : "Producto guardado y desactivado: no se vende");
+    }).then(function () { state.prodForm = null; render(); }).catch(function (e) { f.busy = false; f.err = e.message; render(); });
+  }
   function settingsHTML() {
-    var rows = PRODUCTS.map(function (p) {
+    var rows = PRODUCTS.filter(function (p) { return !p.extra; }).map(function (p) {
       if (!sellable(p) && p.disponible !== false) {
         return "<tr><td><b>" + esc(p.name) + '</b> <span class="tag">Borrador</span><br><span class="note">' + esc(pendientes(p).join(" · ")) + '</span></td><td class="r">' +
           (typeof p.opts[0][1] === "number" ? money(p.opts[0][1]) : "Sin precio") + "</td><td></td></tr>";
@@ -554,13 +679,14 @@
       return p.opts.map(function (o, i) {
         return "<tr><td>" + (i === 0 ? "<b>" + esc(p.name) + "</b>" : "") + (p.opts.length > 1 ? " <span class='note'>" + esc(o[0]) + "</span>" : "") + "</td>" +
           '<td class="r"><input type="number" inputmode="decimal" data-price="' + p.id + '" data-opt="' + i + '" value="' + price(p, i) + '"></td>' +
-          '<td class="r">' + (i === 0 ? '<button type="button" class="chk' + (db.settings.soldOut[p.id] ? " on" : "") + '" data-out="' + p.id + '">' + (db.settings.soldOut[p.id] ? "Agotado" : "Disponible") + "</button>" : "") + "</td></tr>";
+          '<td class="r">' + (i === 0 ? '<button type="button" class="chk' + (agotado(p.id) ? " on" : "") + '" data-out="' + p.id + '">' + (agotado(p.id) ? "Agotado" : "Disponible") + "</button>" : "") + "</td></tr>";
       }).join("");
     }).join("");
     return '<div class="page"><div class="page-in"><h2>Ajustes</h2>' +
       "<h3>Precios y disponibilidad</h3>" +
       '<div class="card prices"><table><tr><th>Producto</th><th class="r">Precio</th><th class="r"></th></tr>' + rows + "</table>" +
-      '<p class="note">Los cambios se guardan al salir de cada casilla. Si cambias un precio aquí, cámbialo también en el menú web.</p></div>' +
+      '<p class="note">Se guarda al salir de cada casilla y cambia también en el menú web (hace falta internet). La cerveza es solo de la caja: se guarda en este iPad.</p></div>' +
+      "<h3>Productos nuevos</h3>" + productosHTML() +
       "<h3>Pedidos del menú web</h3>" +
       '<div class="card"><p>' + (token() ? "Sesión de <b>" + esc(ses.usuario || "caja") + "</b>, vence el " + esc(fecha(new Date(sesExp()).toISOString())) + "." : "Sin sesión.") + "</p>" +
       '<p class="note">' + (ped.ok ? "Conectado." : ped.ok === false ? esc(ped.error) : "Sin conectar todavía.") + "</p>" +
@@ -585,6 +711,7 @@
   /* las alitas de un combo se reparten por sabor con el contador (alas), todas con receta secreta de entrada; las partes de un solo sabor, con un botón */
   function basePart(c) {
     var r = c.pid ? prod(c.pid) : null, alas = null;
+    if (c.sabor) return { sauces: [c.sabor], quitar: [], opcion: "", alas: null };   /* sabor fijo (Alicombo) */
     if (r && r.sauces && !c.unSabor) { alas = {}; alas[SAUCES[0]] = piezasParte(c); }
     return { sauces: [], quitar: [], opcion: "", alas: alas };
   }
@@ -599,6 +726,7 @@
     return p.parts.map(function (c, i) {
       var r = c.pid ? prod(c.pid) : null, ps = s.comps[i], h = "<h4>" + esc(c.label) + (c.pend ? ' <small class="pend">· ' + esc(c.pend) + "</small>" : "") + "</h4>";
       if (r && r.sauces && ps.alas) h += contadorHTML(ps.alas, piezasParte(c), ' data-cparte="' + i + '"');
+      else if (r && r.sauces && c.sabor) h += "<p class='note'>Sabor: " + esc(c.sabor) + "</p>";
       else if (r && r.sauces) h += "<div class='chips'>" + SAUCES.map(function (n) {
         return '<button type="button" class="chip' + (ps.sauces.indexOf(n) >= 0 ? " on" : "") + '" data-part="' + i + '" data-psauce="' + esc(n) + '">' + esc(n) + "</button>";
       }).join("") + "</div>";
@@ -606,7 +734,7 @@
         return '<button type="button" class="chip' + (ps.quitar.indexOf(n) >= 0 ? " off" : "") + '" data-part="' + i + '" data-pquitar="' + esc(n) + '">Sin ' + esc(n.toLowerCase()) + "</button>";
       }).join("") + "</div>";
       /* opciones (el refresco del combo): las que se pueden vender y no están agotadas */
-      if (c.opciones) h += "<div class='chips'>" + c.opciones.map(prod).filter(function (o) { return o && sellable(o) && !db.settings.soldOut[o.id]; }).map(function (o) {
+      if (c.opciones) h += "<div class='chips'>" + c.opciones.map(prod).filter(function (o) { return o && sellable(o) && !agotado(o.id); }).map(function (o) {
         return '<button type="button" class="chip' + (ps.opcion === o.id ? " on" : "") + '" data-part="' + i + '" data-popcion="' + o.id + '">' + esc(o.name) + "</button>";
       }).join("") + "</div>";
       return '<div class="part">' + h + "</div>";
@@ -778,7 +906,7 @@
       if ((el = find(t, "[data-pcobrar]"))) return cobrarPedido(attr(el, "data-pcobrar"));
       if ((el = find(t, "[data-pruta]"))) return rutaPedido(attr(el, "data-pruta"));
       if (find(t, '[data-act="close-ped"]') || t.className === "overlay big-ov") { ped.open = null; ped.ask = null; return renderLayer(); }
-      if (find(t, ".wa-cli") || find(t, ".cli a")) return;
+      if (find(t, ".cli a")) return;
       return;
     }
     if ((el = find(t, "[data-ptab]"))) { ped.tab = attr(el, "data-ptab"); return render(); }
@@ -829,7 +957,7 @@
       }
       /* hotdog: "Con tocino" cambia entre el sencillo y el de tocino (se conservan cantidad y lo que se quitó) */
       if (find(t, '[data-act="tocino"]')) {
-        if (!p.base && db.settings.soldOut[p.tocino]) { toast("El hotdog con tocino está marcado como agotado"); return; }
+        if (!p.base && agotado(p.tocino)) { toast("El hotdog con tocino está marcado como agotado"); return; }
         s.pid = p.base ? p.base : p.tocino; return renderLayer();
       }
       /* combo: salsa o ingrediente de una parte */
@@ -901,17 +1029,17 @@
     /* vender */
     if ((el = find(t, "[data-cat]"))) { state.cat = attr(el, "data-cat"); return render(); }
     if (find(t, '[data-act="alas-perso"]')) {
-      if (db.settings.soldOut.alitas) { toast("Las alitas están marcadas como agotadas"); return; }
+      if (agotado("alitas")) { toast("Las alitas están marcadas como agotadas"); return; }
       return openPick(prod("alitas"), "", true);
     }
     if ((el = find(t, "[data-sabor]"))) {
-      if (db.settings.soldOut.alitas) { toast("Las alitas están marcadas como agotadas"); return; }
+      if (agotado("alitas")) { toast("Las alitas están marcadas como agotadas"); return; }
       return openPick(prod("alitas"), attr(el, "data-sabor"));
     }
     if ((el = find(t, "[data-ranch]"))) { setRanch(attr(el, "data-ranch") === "1"); return render(); }
     if ((el = find(t, "[data-add]"))) {
       var pr = prod(attr(el, "data-add"));
-      if (db.settings.soldOut[pr.id] || pr.disponible === false) { toast(pr.name + " no está disponible"); return; }
+      if (agotado(pr.id) || pr.disponible === false) { toast(pr.name + " no está disponible"); return; }
       return openPick(pr);
     }
     if ((el = find(t, "[data-line]"))) {
@@ -963,7 +1091,21 @@
     if ((el = find(t, "[data-hist]"))) { var hk = "h" + attr(el, "data-hist"); state.openSale = state.openSale === hk ? null : hk; return render(); }
 
     /* ajustes */
-    if ((el = find(t, "[data-out]"))) { var id = attr(el, "data-out"); db.settings.soldOut[id] = !db.settings.soldOut[id]; save(); return render(); }
+    if ((el = find(t, "[data-out]"))) {
+      var id = attr(el, "data-out");
+      if (SOLO_CAJA[id]) { db.settings.soldOut[id] = !db.settings.soldOut[id]; save(); return render(); }
+      var poner = !agotado(id);
+      guardarCatalogo(function (c) { if (poner) c.agotado[id] = true; else delete c.agotado[id]; }, poner ? "Marcado como agotado, también en el menú web" : "Disponible otra vez, también en el menú web").catch(function () {});
+      return;
+    }
+    if (find(t, '[data-act="prod-new"]')) { state.prodForm = { id: "", name: "", desc: "", price: "", cat: "combos", img: "", foto: "", disponible: true, err: "" }; return render(); }
+    if ((el = find(t, "[data-pedit]"))) {
+      db.catalogo.extra.forEach(function (x) { if (x.id === attr(el, "data-pedit")) state.prodForm = { id: x.id, name: x.name, desc: x.desc, price: String(x.price), cat: x.cat, img: x.img, foto: "", disponible: x.disponible !== false, err: "" }; });
+      return render();
+    }
+    if (state.prodForm && find(t, '[data-act="prod-toggle"]')) { state.prodForm.disponible = !state.prodForm.disponible; return render(); }
+    if (find(t, '[data-act="prod-cancel"]')) { state.prodForm = null; return render(); }
+    if (find(t, '[data-act="prod-save"]')) return guardarProducto();
     if (find(t, '[data-act="copy-backup"]')) { toast(copyText(JSON.stringify(db)) ? "Respaldo copiado: pégalo en un chat" : "No se pudo copiar"); return; }
     if (find(t, '[data-act="show-import"]')) { state.confirm = "import"; return render(); }
     if (find(t, '[data-act="do-import"]')) {
@@ -980,9 +1122,22 @@
     var t = e.target;
     if (t.id === "nota") state.nota = t.value;
     if (t.id === "dir") state.dir = t.value;
+    if (state.prodForm && t.id === "pf-name") state.prodForm.name = t.value;
+    if (state.prodForm && t.id === "pf-desc") state.prodForm.desc = t.value;
+    if (state.prodForm && t.id === "pf-price") state.prodForm.price = t.value;
   });
   document.addEventListener("change", function (e) {
     var t = e.target;
+    if (state.prodForm && t.id === "pf-cat") state.prodForm.cat = t.value;
+    if (state.prodForm && t.id === "pf-file" && t.files && t.files[0]) achicarFoto(t.files[0]);
+    if (t.getAttribute("data-price") && !SOLO_CAJA[t.getAttribute("data-price")]) {
+      var cp = prod(t.getAttribute("data-price")), co = Number(t.getAttribute("data-opt")), cv = Number(t.value);
+      if (t.value === "" || !(cv >= 1 && cv <= 5000)) { t.value = price(cp, co); toast("Precio no válido (de 1 a 5000)"); return; }
+      var arr = cp.opts.map(function (x, i) { return price(cp, i); }); arr[co] = Math.round(cv);
+      if (arr[co] === price(cp, co)) return;
+      guardarCatalogo(function (c) { c.precios[cp.id] = arr; }, "Precio guardado: también cambió en el menú web").catch(function () {});
+      return;
+    }
     if (t.getAttribute("data-price")) {
       var pid = t.getAttribute("data-price"), o = Number(t.getAttribute("data-opt"));
       if (!db.settings.prices[pid]) db.settings.prices[pid] = {};
@@ -1000,7 +1155,7 @@
      ========================================================= */
   var API = "/api/pedidos";
   var ped = { list: [], known: {}, ok: null, error: "", tab: "activos", open: null, ask: null, busy: false, banner: null, first: true };
-  var ESTADO_TXT = { nuevo: "Nuevo", aceptado: "Preparando", listo: "Listo", entregado: "Entregado", rechazado: "Rechazado" };
+  var ESTADO_TXT = { nuevo: "Nuevo", aceptado: "Aceptado", preparando: "En preparación", listo: "Listo", entregado: "Entregado", rechazado: "Cancelado" };
   /* =========================================================
      ENTRADA A LA CAJA: usuario y contraseña (CAJA_USUARIO y CAJA_PASSWORD en Netlify).
      El servidor da una sesión firmada que dura 30 días en este iPad; sin ella no se ven los pedidos.
@@ -1048,7 +1203,7 @@
       });
   }
   function logout() { setSes(null); ped.list = []; ped.known = {}; ped.ok = null; refreshPedidos(); showLogin(); }
-  function activos() { return ped.list.filter(function (p) { return p.estado === "nuevo" || p.estado === "aceptado" || p.estado === "listo"; }); }
+  function activos() { return ped.list.filter(function (p) { return p.estado === "nuevo" || p.estado === "aceptado" || p.estado === "preparando" || p.estado === "listo"; }); }
   function nuevos() { return ped.list.filter(function (p) { return p.estado === "nuevo"; }).length; }
   function findPed(key) { for (var i = 0; i < ped.list.length; i++) if (ped.list[i].key === key) return ped.list[i]; return null; }
   function ago(iso) {
@@ -1059,7 +1214,7 @@
   function api(method, path, body) {
     var opts = { method: method, headers: { "authorization": "Bearer " + token() }, cache: "no-store" };
     if (body) { opts.headers["content-type"] = "application/json"; opts.body = JSON.stringify(body); }
-    return withTimeout(fetch(API + path, opts), 12000).then(function (r) {
+    return withTimeout(fetch(path.indexOf("/api/") === 0 ? path : API + path, opts), 12000).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (d) {
         if (r.status === 401 && d.login) { setSes(null); showLogin(d.error); }
         if (!r.ok || !d.ok) throw new Error(d.error || ("Error " + r.status));
@@ -1067,6 +1222,9 @@
       });
     });
   }
+
+  /* sin zoom con dos dedos en Safari de iOS (no respeta user-scalable=no ni touch-action) */
+  ["gesturestart", "gesturechange"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
 
   /* sonido de aviso (Safari pide un toque antes de poder sonar) */
   var audio = null;
@@ -1102,6 +1260,7 @@
       });
       ped.first = false;
       ped.list = d.pedidos;
+      if (d.catalogoV != null && d.catalogoV !== db.catalogo.v) cargarCatalogo();
       if (fresh.length) { ped.banner = fresh[fresh.length - 1].key; beep(); }
       refreshPedidos();
     }).catch(function (e) {
@@ -1110,7 +1269,7 @@
     });
   }
   setInterval(poll, 10000);
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) poll(); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { poll(); cargarCatalogo(); } });
 
   /* actualiza solo lo que cambia, para no interrumpir una venta */
   function refreshPedidos() {
@@ -1146,20 +1305,23 @@
     var ticket = c.ticket === "correo" ? "<p><b>Ticket:</b> mandarlo a " + esc(c.email) + "</p>" : c.ticket === "pdf" ? "<p><b>Ticket:</b> el cliente descargó su PDF</p>" : "";
     return '<div class="cli"><p><b>' + esc(c.nombre) + '</b> · <a href="tel:' + esc(c.telefono.replace(/\s/g, "")) + '">' + esc(c.telefono) + "</a></p>" +
       "<p><b>" + esc(c.entregaLabel) + "</b>" + (c.direccion ? ": " + esc(c.direccion) : "") + (c.referencias ? " <span class='note'>(" + esc(c.referencias) + ")</span>" : "") + "</p>" +
+      (c.ubicacion ? '<p>Ubicación confirmada por el cliente (GPS): <a href="' + esc(puntoURL(c)) + '" target="_blank" rel="noopener">ver en Maps</a></p>' : "") +
+      (c.mapa && !c.ubicacion ? '<p>Enlace de Maps del cliente: <a href="' + esc(c.mapa) + '" target="_blank" rel="noopener">abrir</a></p>' : "") +
       "<p><b>Pago:</b> " + pago + "</p>" + ticket + (c.notas ? '<p class="nota">Nota: ' + esc(c.notas) + "</p>" : "") + "</div>";
   }
   function actionsHTML(p) {
     if (ped.ask === "rechazar-" + p.key) {
-      return '<div class="confirm"><p>¿Rechazar el pedido #' + p.folio + "? Avísale al cliente por WhatsApp.</p>" +
-        '<div class="row2"><button type="button" class="btn ghost" data-pact="no">No</button><button type="button" class="btn red" data-pact="rechazado" data-key="' + esc(p.key) + '">Sí, rechazar</button></div></div>';
+      return '<div class="confirm"><p>¿Cancelar el pedido #' + p.folio + "? El cliente lo verá en su página de seguimiento" + (p.estado === "nuevo" ? "." : ". Si ya pagó por transferencia, llámale para regresarle su dinero.") + "</p>" +
+        '<div class="row2"><button type="button" class="btn ghost" data-pact="no">No</button><button type="button" class="btn red" data-pact="rechazado" data-key="' + esc(p.key) + '">Sí, cancelar</button></div></div>';
     }
-    var wa = "https://wa.me/52" + p.cliente.telefono.replace(/\D/g, "").slice(-10) + "?text=" + encodeURIComponent("Hola " + p.cliente.nombre + ", recibimos tu pedido #" + p.folio + " en El Carboncito. ");
     var b = [];
     if (p.estado === "nuevo") { b.push('<button type="button" class="btn ghost" data-pask="rechazar-' + esc(p.key) + '">Rechazar</button>'); b.push('<button type="button" class="btn" data-pact="aceptado" data-key="' + esc(p.key) + '">Aceptar pedido</button>'); }
-    if (p.estado === "aceptado") b.push('<button type="button" class="btn" data-pact="listo" data-key="' + esc(p.key) + '">Ya está listo</button>');
-    if (p.estado === "aceptado" || p.estado === "listo") b.push('<button type="button" class="btn green" data-pcobrar="' + esc(p.key) + '">Cobrar y entregar</button>');
+    if (p.estado === "aceptado") b.push('<button type="button" class="btn dark" data-pact="preparando" data-key="' + esc(p.key) + '">Empezar a preparar</button>');
+    if (p.estado === "aceptado" || p.estado === "preparando") b.push('<button type="button" class="btn" data-pact="listo" data-key="' + esc(p.key) + '">Ya está listo</button>');
+    if (p.estado === "aceptado" || p.estado === "preparando" || p.estado === "listo") b.push('<button type="button" class="btn green" data-pcobrar="' + esc(p.key) + '">Cobrar y entregar</button>');
     if (p.cliente.entrega === "domicilio" && p.estado !== "rechazado") b.push('<button type="button" class="btn dark" data-pruta="' + esc(p.key) + '">Ruta (QR)</button>');
-    return '<div class="row2">' + b.join("") + '</div><a class="wa-cli" href="' + esc(wa) + '" target="_blank" rel="noopener">Escribirle por WhatsApp</a>';
+    if (p.estado === "aceptado" || p.estado === "preparando" || p.estado === "listo") b.push('<button type="button" class="btn ghost" data-pask="rechazar-' + esc(p.key) + '">Cancelar pedido</button>');
+    return '<div class="row2">' + b.join("") + "</div>";
   }
   function ordersHTML() {
     if (!token()) {
@@ -1201,7 +1363,7 @@
     var p = findPed(key); if (!p) return;
     var c = p.cliente;
     openRuta("Pedido web #" + p.folio + " · " + c.nombre + " · " + money(p.total), c.direccion,
-      (c.referencias ? "Referencias: " + c.referencias + ". " : "") + "Tel. " + c.telefono + (c.pago === "efectivo" && c.pagaCon ? " · paga con " + money(c.pagaCon) : ""));
+      (c.referencias ? "Referencias: " + c.referencias + ". " : "") + "Tel. " + c.telefono + (c.pago === "efectivo" && c.pagaCon ? " · paga con " + money(c.pagaCon) : ""), puntoURL(c, true));
   }
   /* pasa el pedido al ticket para cobrarlo y que cuente en el corte */
   function cobrarPedido(key) {
@@ -1214,7 +1376,7 @@
     });
     state.ranch = conRanch(state.cart);
     state.tipo = p.cliente.entrega === "domicilio" ? "domicilio" : "llevar";
-    state.dir = p.cliente.direccion || "";
+    state.dir = ((p.cliente.direccion || "") + (p.cliente.ubicacion || p.cliente.mapa ? " " + puntoURL(p.cliente) : "")).trim();
     state.nota = "Pedido web #" + p.folio + " · " + p.cliente.nombre;
     state.fromPedido = key; state.fromPend = null;
     ped.open = null; state.view = "sell";
@@ -1225,6 +1387,7 @@
   document.addEventListener("keydown", function (e) {
     if ((e.keyCode === 13 || e.key === "Enter") && (e.target.id === "l-pass" || e.target.id === "l-user")) { e.preventDefault(); doLogin(); }
   });
+  cargarCatalogo();
   poll();
 
   render();

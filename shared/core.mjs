@@ -167,8 +167,9 @@ export function normalizeOrder(body, cat = CATALOG) {
   if (!items.length) throw new Error("El pedido no tiene productos.");
   const lines = items.map((it) => {
     const p = it && own(cat, it.id) ? cat[it.id] : null;
-    if (!p) throw new Error("Hay un producto que ya no está en el menú.");
-    if (!sellable(p)) throw new Error(`${p.name} no está disponible ahorita.`);
+    if (!p) throw new Error(it && ID_PROMO.test(String(it.id)) ? "La oferta ya terminó." : "Hay un producto que ya no está en el menú.");
+    if (!sellable(p)) throw new Error(p.promo ? `${p.name}: ya no quedan lugares.` : `${p.name} no está disponible ahorita.`);
+    if (p.promo && Math.floor(Number(it.qty) || 1) !== 1) throw new Error(`${p.name} es una por pedido.`);
     const opt = Number(it.opt) || 0;
     if (!p.opts[opt]) throw new Error("Hay una opción que ya no existe.");
     const qty = Math.max(1, Math.min(30, Math.floor(Number(it.qty) || 1)));
@@ -182,7 +183,7 @@ export function normalizeOrder(body, cat = CATALOG) {
       sauces,
       sin: off.map((x) => N[x]),
       lleva: Object.keys(counts).map((x) => N[x] + (counts[x] > 1 ? " ×" + counts[x] : "")),
-      componentes: p.parts ? componentes(p, it.combo, cat) : [],
+      componentes: p.parts ? componentes(p, it.combo, cat) : p.promoItems || [],
     };
   });
   const c = body.cliente || {};
@@ -368,6 +369,83 @@ function medidasImagen(b) {
   return null;
 }
 
+/* ================== Promos del día ==================
+   Las crea la caja: productos (como vienen, sin elegir sabores ni refresco), precio, duración, nombre (si no, "Oferta flash")
+   y dinámica: los primeros N clientes, el primero que la pida, o un reto en el local (solo instrucciones, se cobra en la caja).
+   El servidor pone la hora de inicio y fin, cuenta los cupos (pedidos web y ventas de la caja) y cobra el precio de la oferta. */
+const PROMOS = "promos/config";
+const ID_PROMO = /^p-[a-z0-9]{4,20}$/, ID_DIN = /^d-[a-z0-9]{4,20}$/;
+const DINAMICAS = { primeros: "Los primeros clientes", primero: "El primero que la pida se la lleva", reto: "Reto en el local" };
+export async function leerPromos(store) {
+  return (await store.get(PROMOS, { type: "json" })) || { v: 0, promos: [], dinamicas: [] };
+}
+/* un producto entra a una oferta si se puede servir como viene: sin sabores, sin refresco ni partes por elegir */
+function comoViene(p, cat) {
+  if (!p || p.sauces) return false;
+  return !p.parts || p.parts.every((c) => !c.opciones && !c.unSabor && (c.sabor || !(c.pid && own(cat, c.pid) && cat[c.pid].sauces)));
+}
+const nombrePromo = (pr) => pr.nombre || "Oferta flash";
+const vigente = (pr, now) => !pr.terminada && pr.inicio <= now && now < pr.fin;
+function limpiarPromos(b, prev, cat, now) {
+  const viejas = {}; (prev.promos || []).forEach((p) => { viejas[p.id] = p; });
+  const ids = new Set();
+  const dinamicas = (Array.isArray(b.dinamicas) ? b.dinamicas : []).slice(0, 20).map((d) => ({ id: str(d && d.id, 24), texto: str(d && d.texto, 140) }))
+    .filter((d) => ID_DIN.test(d.id) && d.texto);
+  const promos = (Array.isArray(b.promos) ? b.promos : []).slice(0, 12).map((x) => {
+    const id = str(x && x.id, 24);
+    if (!ID_PROMO.test(id) || ids.has(id)) throw new Error("Hay una oferta con un identificador no válido.");
+    ids.add(id);
+    const items = (Array.isArray(x.items) ? x.items : []).slice(0, 6).map((it) => {
+      const p = it && own(cat, it.id) ? cat[it.id] : null, opt = Number(it.opt) || 0, qty = Math.floor(Number(it.qty) || 1);
+      if (!p || !p.opts[opt] || !comoViene(p, cat)) throw new Error("Una oferta lleva un producto que no se puede ofrecer (los de sabor o refresco a elegir no entran).");
+      if (qty < 1 || qty > 10) throw new Error("Cada producto de la oferta va de 1 a 10.");
+      return { id: it.id, opt, qty };
+    });
+    if (!items.length) throw new Error("La oferta no tiene productos.");
+    const precioP = precio(x.precio);
+    if (!precioP) throw new Error("El precio de la oferta debe ser un número entero de 1 a 5000.");
+    const din = x.dinamica || {}, tipo = own(DINAMICAS, din.tipo) ? din.tipo : "primeros";
+    const cupo = tipo === "primero" ? 1 : Math.max(1, Math.min(500, Math.floor(Number(din.cupo) || 1)));
+    const texto = tipo === "reto" ? str(din.texto, 140) : "";
+    if (tipo === "reto" && !texto) throw new Error("Escribe las instrucciones del reto.");
+    const vieja = viejas[id];
+    /* la hora la pone el servidor: el reloj del iPad puede estar mal */
+    let inicio = vieja ? vieja.inicio : now, fin = vieja ? vieja.fin : 0;
+    if (!vieja) {
+      const min = Math.floor(Number(x.duracionMin) || 0);
+      if (min < 5 || min > 24 * 60) throw new Error("La oferta dura de 5 minutos a 24 horas.");
+      fin = now + min * 60e3;
+    }
+    return { id, nombre: str(x.nombre, 40), items, precio: precioP, inicio, fin, dinamica: { tipo, cupo, texto }, terminada: !!(x.terminada || (vieja && vieja.terminada)) };
+  });
+  /* las que la caja ya no manda se conservan terminadas un día (los pedidos las nombran); luego se borran */
+  (prev.promos || []).forEach((p) => { if (!ids.has(p.id) && now - p.fin < 864e5) promos.push(Object.assign({}, p, { terminada: true })); });
+  return { promos: promos.filter((p) => now - p.fin < 2 * 864e5), dinamicas };
+}
+async function usosPromo(store, id) { return (await store.list({ prefix: `promo-uso/${id}/` })).blobs.length; }
+/* vista de una oferta: lo que el menú y la caja necesitan para mostrarla */
+async function vistaPromo(store, pr, cat, now) {
+  const usados = await usosPromo(store, pr.id);
+  const items = pr.items.filter((it) => own(cat, it.id)).map((it) => ({ id: it.id, opt: it.opt, qty: it.qty, name: cat[it.id].name, optLabel: cat[it.id].opts.length > 1 ? cat[it.id].opts[it.opt][0] : "" }));
+  const normal = pr.items.reduce((s, it) => s + (own(cat, it.id) ? cat[it.id].opts[it.opt][1] * it.qty : 0), 0);
+  return { id: pr.id, nombre: nombrePromo(pr), items, precio: pr.precio, normal, inicio: pr.inicio, fin: pr.fin,
+    dinamica: { tipo: pr.dinamica.tipo, cupo: pr.dinamica.cupo, texto: pr.dinamica.texto, quedan: Math.max(0, pr.dinamica.cupo - usados) },
+    usados, enLinea: pr.dinamica.tipo !== "reto", vigente: vigente(pr, now) && usados < pr.dinamica.cupo, terminada: !!pr.terminada };
+}
+/* las ofertas vigentes entran al catálogo del pedido como un producto más, una por pedido */
+async function catalogoConPromos(store, cat, now) {
+  const { promos } = await leerPromos(store);
+  const vivas = {};
+  for (const pr of promos) {
+    if (!vigente(pr, now) || pr.dinamica.tipo === "reto") continue;
+    const v = await vistaPromo(store, pr, cat, now);
+    vivas[pr.id] = v;
+    cat[pr.id] = { name: v.nombre, recipe: [], fixed: [], opts: [["", pr.precio]], disponible: v.vigente, promo: true,
+      promoItems: v.items.map((it) => ({ label: `${it.qty}× ${it.name}${it.optLabel ? " (" + it.optLabel + ")" : ""}`, sauces: [], sin: [], opcion: "" })) };
+  }
+  return vivas;
+}
+
 /* ================== Seguimiento del pedido para el cliente ==================
    Al mandar su pedido, el teléfono recibe una cookie de invitado (aleatoria, HttpOnly). El pedido guarda el hash de esa cookie,
    así solo ese navegador puede verlo. Para pasarlo a la app de la pantalla de inicio hay un enlace con un token firmado que vence. */
@@ -487,6 +565,14 @@ export async function handle(req, store, cfg, ip = "") {
       if (!f) return json({ error: "No encontrado." }, 404);
       return new Response(desdeB64u(f.datos), { headers: { "content-type": f.tipo, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" } });
     }
+    /* ---- ofertas: las vigentes para el menú; con la sesión de la caja, todas las recientes y las dinámicas guardadas ---- */
+    if (req.method === "GET" && ruta === "/api/promos") {
+      const now = Date.now(), cat = catalogoCon(await leerAjustes(store)), cfgP = await leerPromos(store);
+      const admin = await sesionValida(cfg, bearer);
+      const lista = [];
+      for (const pr of cfgP.promos) if (admin ? now - pr.fin < 864e5 : vigente(pr, now)) lista.push(await vistaPromo(store, pr, cat, now));
+      return json(Object.assign({ ok: true, ahora: now, promos: lista }, admin ? { dinamicas: cfgP.dinamicas } : {}));
+    }
     /* ---- clave pública para notificaciones ---- */
     if (req.method === "GET" && ruta === "/api/push/clave") return json({ ok: true, clave: pushListo(cfg) ? cfg.vapidPublic : "" });
 
@@ -497,6 +583,7 @@ export async function handle(req, store, cfg, ip = "") {
       const body = await req.json().catch(() => null);
       if (body && body.website) return json({ ok: true, folio: 0 }); /* trampa para robots */
       const cat = catalogoCon(await leerAjustes(store));
+      const vivas = await catalogoConPromos(store, cat, Date.now());
       const o = normalizeOrder(body, cat); /* un pedido con errores no cuenta para la espera */
       /* si un precio cambió mientras el cliente tenía el carrito abierto, se le enseña el total nuevo antes de crear el pedido */
       if (body.totalVisto != null && Number(body.totalVisto) !== o.total && !body.confirmado) {
@@ -513,6 +600,8 @@ export async function handle(req, store, cfg, ip = "") {
       }
       const inv = leerCookie(req, COOKIE) || aleatorio();
       const p = await crearPedido(store, body, new Date(), cat, await sha("invitado:" + inv));
+      /* cada oferta pedida ocupa un lugar (se cuentan para "los primeros N") */
+      for (const l of p.lines) if (own(vivas, l.pid)) await store.setJSON(`promo-uso/${l.pid}/${idPedido(p.key)}`, { t: Date.now() });
       if (lim) await store.setJSON(lim, { t: Date.now() });
       const cookie = `${COOKIE}=${inv}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax${cfg.secure ? "; Secure" : ""}`;
       return json({ ok: true, folio: p.folio, total: p.total, pedido: p.key, token: cfg.password ? await tokenPedido(cfg, p.key) : "" }, 200, { "set-cookie": cookie });
@@ -598,6 +687,23 @@ export async function handle(req, store, cfg, ip = "") {
       const aj = Object.assign(limpiarAjustes(b, await leerAjustes(store)), { v: Date.now() });
       await store.setJSON(AJUSTES, aj);
       return json(Object.assign({ ok: true }, ajustesPublicos(aj)));
+    }
+    if (req.method === "POST" && ruta === "/api/promos") {
+      const b = await req.json().catch(() => ({}));
+      const now = Date.now(), prev = await leerPromos(store);
+      const nuevo = Object.assign(limpiarPromos(b, prev, catalogoCon(await leerAjustes(store)), now), { v: now });
+      await store.setJSON(PROMOS, nuevo);
+      const cat = catalogoCon(await leerAjustes(store)), lista = [];
+      for (const pr of nuevo.promos) if (now - pr.fin < 864e5) lista.push(await vistaPromo(store, pr, cat, now));
+      return json({ ok: true, ahora: now, promos: lista, dinamicas: nuevo.dinamicas });
+    }
+    /* ventas de una oferta en la caja: también ocupan lugar */
+    if (req.method === "POST" && ruta === "/api/promos/usar") {
+      const b = await req.json().catch(() => ({}));
+      const id = str(b.id, 24), n = Math.max(1, Math.min(10, Math.floor(Number(b.n) || 1)));
+      if (!ID_PROMO.test(id)) return json({ error: "Oferta no válida." }, 400);
+      for (let i = 0; i < n; i++) await store.setJSON(`promo-uso/${id}/caja-${Date.now()}-${aleatorio().slice(0, 6)}`, { t: Date.now() });
+      return json({ ok: true, usados: await usosPromo(store, id) });
     }
     if (req.method === "POST" && ruta === "/api/catalogo/img") {
       const len = Number(req.headers.get("content-length") || 0);

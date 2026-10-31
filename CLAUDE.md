@@ -90,6 +90,18 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Variables: `VAPID_PUBLIC` y `VAPID_PRIVATE` (sin ellas el botón dice que los avisos no están listos y el seguimiento sigue igual). Un par distinto para pruebas y para producción.
 - WhatsApp y n8n ya no forman parte del flujo de pedidos (se quitaron `/api/avisos`, `aviso/…`, `AVISOS_TOKEN` y `n8n/`). Siguen los enlaces que el cliente toca él mismo: mandar captura de transferencia y el respaldo si el pedido no se pudo enviar. El Docker de n8n/Evolution en la PC de la casa no se tocó; se puede apagar.
 
+## Promos del día
+
+- Se crean en Caja › Ajustes › Promos del día y se guardan en `promos/config` (Blobs): productos (solo los que se sirven como vienen: nada de sabores de alitas ni refresco por elegir), precio, duración (5 min a 24 h; la hora de inicio y fin la pone el servidor), nombre opcional ("Oferta flash" si va vacío) y dinámica: `primeros` (los primeros N clientes), `primero` (el primero que la pida) o `reto` (instrucciones para el local, por ejemplo "el primero que llegue disfrazado de catrín"). Los retos se guardan para reusarlos (`dinamicas`).
+- `GET /api/promos` da las vigentes al menú (con `ahora` del servidor para el contador); con la sesión de la caja da también las de las últimas 24 h y los retos. `POST /api/promos` (caja) guarda; `POST /api/promos/usar` aparta lugares por ventas de la caja.
+- El menú las muestra como alerta fija abajo (abierta la primera vez, luego pastilla) con contador. Las de `primeros`/`primero` se piden en línea, una por pedido, al precio de la oferta; los lugares se cuentan con `promo-uso/<id>/…` (pedidos web y ventas de la caja). Los retos no se piden en línea: se cobran en la caja, pestaña Promos. Dos pedidos en el mismo instante podrían pasarse por uno del cupo (no hay transacciones en Blobs).
+
+## Rendimiento del menú
+
+- La lista usa iconos ya hechos (`img/mini/<id>.webp`, ~10 KB cada uno), sacados de las mismas capas del constructor. Si cambia cómo se ve un producto o se agrega uno fijo, hay que volver a generarlos (Edge sin ventana: armar el icono con las capas y guardarlo como WebP a 252×210). Los productos nuevos de la caja usan su foto.
+- Las fotos de las capas se piden hasta que el cliente toca, desliza o escribe (y las del producto que toca, primero). jsPDF se carga solo si el cliente pide su ticket en PDF; qrcode-generator solo en computadora. Las fuentes de Google no frenan el primer dibujo.
+- PageSpeed (móvil) de producción, 31 oct 2026, antes de esto: 99. El sitio de pruebas no se puede medir con PageSpeed porque es privado (mide la página de login de Netlify).
+
 ## Ubicación de entrega
 
 - En "Tu pedido" (domicilio): dirección escrita, número interior y referencias; "Usar mi ubicación" (GPS con permiso; se muestra el punto para revisarlo en Maps y se puede quitar) y un campo para pegar el enlace de Google Maps. Basta cualquiera de los tres. "Buscar en Google Maps" abre una búsqueda (`api=1`) en otra pestaña; el carrito no se pierde.

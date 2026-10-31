@@ -455,10 +455,10 @@
         /* para pedidos con varios sabores: se reparten las alitas con un contador */
         '<button type="button" class="tile sabor perso' + (agotadas ? " out" : "") + '" data-act="alas-perso"><img src="img/alitas.png" alt=""><b>Alitas personalizadas</b></button>';
     } else {
-      tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat && !p.hidden && !(p.extra && p.disponible === false); }).map(function (p) {
+      tiles = PRODUCTS.filter(function (p) { return p.cat === state.cat && !p.hidden && !(p.extra && p.disponible === false) && !(p.promo && !p.disponible); }).map(function (p) {
         var out = agotado(p.id) || p.disponible === false, draft = !sellable(p) && p.disponible !== false;
         return '<button type="button" class="tile' + (draft ? " draft" : out ? " out" : "") + '" data-add="' + p.id + '">' + imgOf(p) +
-          "<b>" + esc(p.tile || p.name) + "</b></button>";
+          "<b>" + esc(p.tile || p.name) + "</b>" + (p.promo ? '<small class="promo-t tile-t" data-fin="' + p.promo.fin + '">' + resto(p.promo.fin) + "</small>" : "") + "</button>";
       }).join("");
     }
     if (state.cat === "drinks") {
@@ -467,7 +467,7 @@
       for (var b = hay; b < BEBIDA_ESPACIOS; b++) tiles += '<div class="tile slot"><span class="slot-pic"></span><b>Próximamente</b><small>Bebida por confirmar</small></div>';
     }
     if (!tiles) tiles = '<p class="empty">No hay productos en esta sección.</p>';
-    var cats = CATS.map(function (c) { return '<button type="button" data-cat="' + c.id + '" class="' + (c.id === state.cat ? "on" : "") + '">' + esc(c.name) + "</button>"; }).join("") +
+    var cats = catsVenta().map(function (c) { return '<button type="button" data-cat="' + c.id + '" class="' + (c.id === state.cat ? "on" : "") + '">' + esc(c.name) + "</button>"; }).join("") +
       (db.pendientes.length ? '<button type="button" class="pend" data-act="show-pend">Cuentas (' + db.pendientes.length + ")</button>" : "");
     var n = cartCount(), t = cartTotal();
     return '<div class="sell' + (state.showTicket ? " show-ticket" : "") + '">' +
@@ -670,6 +670,148 @@
       }, x.disponible ? "Producto guardado: ya sale en el menú web" : "Producto guardado y desactivado: no se vende");
     }).then(function () { state.prodForm = null; render(); }).catch(function (e) { f.busy = false; f.err = e.message; render(); });
   }
+  /* =========================================================
+     PROMOS DEL DÍA: se crean en Ajustes y salen en el menú web con su contador.
+     El servidor pone la hora, cuenta los lugares y cobra el precio de la oferta.
+     En la caja se venden desde la pestaña "Promos"; cada venta ocupa un lugar.
+     ========================================================= */
+  var promos = { list: [], dinamicas: [], desfase: 0, pidiendo: false, ok: null, vueltas: 0 };
+  var DIN_TXT = { primeros: "Los primeros clientes", primero: "El primero que la pida se la lleva", reto: "Reto en el local" };
+  function ahoraSrv() { return Date.now() + promos.desfase; }
+  function resto(fin) {
+    var s = Math.max(0, Math.round((fin - ahoraSrv()) / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h ? h + " h " + m + " min" : m + ":" + pad(s % 60);
+  }
+  function dinTxt(d) {
+    if (d.tipo === "primeros") return "Los primeros " + d.cupo + " clientes · quedan " + d.quedan;
+    if (d.tipo === "primero") return d.quedan ? "El primero que la pida se la lleva" : "Ya se la llevaron";
+    return "Reto en el local: " + d.texto + (d.cupo > 1 ? " (" + d.cupo + " lugares, quedan " + d.quedan + ")" : d.quedan ? "" : " · ya hubo ganador");
+  }
+  function itemsTxt(pr) { return pr.items.map(function (it) { return it.qty + "× " + it.name + (it.optLabel ? " (" + it.optLabel + ")" : ""); }).join(" + "); }
+  function aplicarPromos(d) {
+    promos.list = d.promos || []; if (d.dinamicas) promos.dinamicas = d.dinamicas;
+    if (typeof d.ahora === "number") promos.desfase = d.ahora - Date.now();
+    PRODUCTS = PRODUCTS.filter(function (p) { return !p.promo; });
+    promos.list.forEach(function (pr) {
+      var primero = pr.items.length ? prod(pr.items[0].id) : null;
+      PRODUCTS.push({ id: pr.id, cat: "promos", name: pr.nombre, desc: itemsTxt(pr) + " · " + dinTxt(pr.dinamica), opts: [["", pr.precio]], quitar: [], promo: pr,
+        img: primero ? (primero.img == null ? primero.id : primero.img) : "", foto: primero && primero.foto, disponible: pr.vigente });
+    });
+    if (state.cat === "promos" && !hayPromos()) state.cat = "burgers";
+  }
+  function hayPromos() { return promos.list.some(function (pr) { return pr.vigente; }); }
+  function catsVenta() { return (hayPromos() ? [{ id: "promos", name: "Promos" }] : []).concat(CATS); }
+  function cargarPromos() {
+    if (!token() || promos.pidiendo) return;
+    promos.pidiendo = true;
+    api("GET", "/api/promos").then(function (d) {
+      promos.pidiendo = false; promos.ok = true; aplicarPromos(d);
+      var a = document.activeElement;
+      if (!(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName))) { if (state.view === "sell" || state.view === "settings") render(); }
+    }).catch(function () { promos.pidiendo = false; promos.ok = false; });
+  }
+  function guardarPromos(cambiar, ok) {
+    var c = {
+      promos: promos.list.map(function (pr) { return { id: pr.id, nombre: pr.nombre === "Oferta flash" ? "" : pr.nombre, items: pr.items.map(function (it) { return { id: it.id, opt: it.opt, qty: it.qty }; }), precio: pr.precio, dinamica: pr.dinamica, terminada: pr.terminada }; }),
+      dinamicas: promos.dinamicas.slice()
+    };
+    cambiar(c);
+    toast("Guardando…");
+    return api("POST", "/api/promos", c).then(function (d) { aplicarPromos(d); render(); toast(ok); })
+      .catch(function (e) { render(); toast("No se guardó: " + (e.message === "tiempo" || /fetch|network|load/i.test(e.message) ? "sin conexión, vuelve a intentarlo" : e.message)); throw e; });
+  }
+  /* un producto entra a una oferta si se sirve como viene: sin sabores ni refresco por elegir */
+  function comoViene(p) {
+    if (!p || p.sauces) return false;
+    return !p.parts || p.parts.every(function (c) { var r = c.pid ? prod(c.pid) : null; return !c.opciones && !c.unSabor && (c.sabor || !(r && r.sauces)); });
+  }
+  function paraOferta() {
+    var L = [];
+    PRODUCTS.forEach(function (p) {
+      if (SOLO_CAJA[p.id] || p.promo || !sellable(p) || !comoViene(p) || (p.extra && p.disponible === false)) return;
+      p.opts.forEach(function (o, i) { L.push({ v: p.id + "|" + i, t: p.name + (p.opts.length > 1 ? " · " + o[0] : ""), p: p, opt: i }); });
+    });
+    return L;
+  }
+  function nuevaPromo() {
+    var L = paraOferta();
+    state.promoForm = { nombre: "", items: [], sel: L.length ? L[0].v : "", qty: "1", precio: "", horas: "1", minutos: "0", din: "primeros", cupo: "5", texto: "", guardarReto: true, err: "", busy: false };
+  }
+  function normalForm(f) { var t = 0; f.items.forEach(function (it) { var p = prod(it.id); if (p) t += price(p, it.opt) * it.qty; }); return t; }
+  function promosHTML() {
+    var f = state.promoForm;
+    var lista = promos.list.map(function (pr) {
+      var viva = pr.vigente, txt = pr.terminada ? "Terminada" : ahoraSrv() >= pr.fin ? "Se acabó el tiempo" : !viva ? "Sin lugares" : "Termina en " + resto(pr.fin);
+      return '<div class="px promo' + (viva ? "" : " off") + '"><div><b>' + esc(pr.nombre) + " · " + money(pr.precio) + " <s>" + money(pr.normal) + "</s></b>" +
+        "<small>" + esc(itemsTxt(pr)) + "</small><small>" + esc(dinTxt(pr.dinamica)) + " · " + pr.usados + " vendidas</small>" +
+        '<small class="promo-t" data-fin="' + pr.fin + '">' + esc(txt) + "</small></div>" +
+        (viva ? '<button type="button" class="btn ghost" data-pterm="' + esc(pr.id) + '">Terminar</button>' : "") + "</div>";
+    }).join("");
+    var form = "";
+    if (f) {
+      var L = paraOferta(), din = '<option value="primeros"' + (f.din === "primeros" ? " selected" : "") + ">Los primeros N clientes</option>" +
+        '<option value="primero"' + (f.din === "primero" ? " selected" : "") + ">El primero que la pida se la lleva</option>" +
+        promos.dinamicas.map(function (d) { return '<option value="' + esc(d.id) + '"' + (f.din === d.id ? " selected" : "") + ">Reto: " + esc(d.texto) + "</option>"; }).join("") +
+        '<option value="nuevo"' + (f.din === "nuevo" ? " selected" : "") + ">Nuevo reto (instrucciones)…</option>";
+      var horas = ""; for (var h = 0; h <= 12; h++) horas += '<option value="' + h + '"' + (String(h) === f.horas ? " selected" : "") + ">" + h + " h</option>";
+      var mins = ""; [0, 5, 10, 15, 20, 30, 45].forEach(function (m) { mins += '<option value="' + m + '"' + (String(m) === f.minutos ? " selected" : "") + ">" + m + " min</option>"; });
+      form = '<div class="pform"><h4>Nueva oferta</h4>' +
+        '<label class="field"><span>Nombre (opcional)</span><input id="pr-nombre" type="text" maxlength="40" placeholder="Oferta flash" value="' + esc(f.nombre) + '"></label>' +
+        '<div class="field"><span>Productos</span>' + (f.items.length ? f.items.map(function (it, i) {
+          var p = prod(it.id); return '<div class="pr-item"><b>' + it.qty + "×</b> " + esc(p ? p.name : it.id) + (p && p.opts.length > 1 ? " · " + esc(p.opts[it.opt][0]) : "") + ' <button type="button" class="chk" data-pritem="' + i + '">Quitar</button></div>';
+        }).join("") : '<p class="note">Agrega uno o más productos. Solo entran los que se sirven como vienen (sin sabor ni refresco por elegir).</p>') +
+        '<div class="pr-add"><select id="pr-sel">' + L.map(function (o) { return '<option value="' + o.v + '"' + (o.v === f.sel ? " selected" : "") + ">" + esc(o.t) + "</option>"; }).join("") + "</select>" +
+        '<input id="pr-qty" type="number" inputmode="numeric" min="1" max="10" value="' + esc(f.qty) + '"><button type="button" class="btn dark" data-act="pr-add">Agregar</button></div></div>' +
+        '<div class="row2"><label class="field"><span>Precio de la oferta' + (f.items.length ? " (normal " + money(normalForm(f)) + ")" : "") + '</span><input id="pr-precio" type="number" inputmode="numeric" min="1" max="5000" value="' + esc(f.precio) + '"></label>' +
+        '<div class="field"><span>Dura</span><div class="pr-dur"><select id="pr-horas">' + horas + '</select><select id="pr-min">' + mins + "</select></div></div></div>" +
+        '<label class="field"><span>Dinámica</span><select id="pr-din">' + din + "</select></label>" +
+        (f.din === "primeros" ? '<label class="field"><span>¿Cuántos clientes pueden entrar?</span><input id="pr-cupo" type="number" inputmode="numeric" min="1" max="500" value="' + esc(f.cupo) + '"></label>' : "") +
+        (f.din === "nuevo" ? '<label class="field"><span>Instrucciones del reto</span><input id="pr-texto" type="text" maxlength="140" placeholder="Ej. El primero que cante una rima completa" value="' + esc(f.texto) + '"></label>' +
+          '<button type="button" class="chk' + (f.guardarReto ? "" : " on") + '" data-act="pr-guardar-reto">' + (f.guardarReto ? "✓ Guardar este reto para otras veces" : "Solo para esta oferta") + "</button>" : "") +
+        (f.din !== "primeros" && f.din !== "primero" ? '<p class="note">Los retos se juegan en el local: el menú muestra las instrucciones y la oferta se cobra aquí en la caja, en la pestaña Promos.</p>' : "") +
+        '<p class="l-err"' + (f.err ? "" : " hidden") + ">" + esc(f.err || "") + "</p>" +
+        '<div class="row2"><button type="button" class="btn ghost" data-act="pr-cancel">Cancelar</button><button type="button" class="btn" data-act="pr-save"' + (f.busy ? " disabled" : "") + ">" + (f.busy ? "Guardando…" : "Publicar oferta") + "</button></div></div>";
+    }
+    var retos = promos.dinamicas.length ? '<h4 style="margin-top:14px">Retos guardados</h4>' + promos.dinamicas.map(function (d) {
+      return '<div class="pr-item">' + esc(d.texto) + ' <button type="button" class="chk" data-prdin="' + esc(d.id) + '">Borrar</button></div>';
+    }).join("") : "";
+    return '<div class="card prods">' + (!token() ? '<p class="note">Entra con la sesión de la caja para crear ofertas.</p>' :
+      (lista || '<p class="note">No hay ofertas. Las que publiques salen en el menú web con su contador.</p>') +
+      (f ? form : '<button type="button" class="btn dark" data-act="pr-new">Nueva oferta</button>') + retos) + "</div>";
+  }
+  function guardarPromo() {
+    var f = state.promoForm; if (!f || f.busy) return;
+    var precio = Number(f.precio), min = Number(f.horas) * 60 + Number(f.minutos), cupo = Number(f.cupo);
+    if (!f.items.length) { f.err = "Agrega al menos un producto."; return render(); }
+    if (!(precio >= 1 && precio <= 5000 && Math.round(precio) === precio)) { f.err = "El precio debe ser un número entero de 1 a 5000."; return render(); }
+    if (min < 5) { f.err = "La oferta dura por lo menos 5 minutos."; return render(); }
+    var dinamica, nuevoReto = null;
+    if (f.din === "primeros") {
+      if (!(cupo >= 1 && cupo <= 500 && Math.round(cupo) === cupo)) { f.err = "¿Cuántos clientes? De 1 a 500."; return render(); }
+      dinamica = { tipo: "primeros", cupo: cupo };
+    } else if (f.din === "primero") dinamica = { tipo: "primero", cupo: 1 };
+    else if (f.din === "nuevo") {
+      if (!String(f.texto).trim()) { f.err = "Escribe las instrucciones del reto."; return render(); }
+      dinamica = { tipo: "reto", cupo: 1, texto: String(f.texto).trim() };
+      if (f.guardarReto) nuevoReto = { id: "d-" + Date.now().toString(36), texto: dinamica.texto };
+    } else {
+      var d = null; promos.dinamicas.forEach(function (x) { if (x.id === f.din) d = x; });
+      if (!d) { f.err = "Elige una dinámica."; return render(); }
+      dinamica = { tipo: "reto", cupo: 1, texto: d.texto };
+    }
+    f.busy = true; f.err = ""; render();
+    guardarPromos(function (c) {
+      c.promos.push({ id: "p-" + Date.now().toString(36), nombre: String(f.nombre).trim(), items: f.items, precio: precio, duracionMin: min, dinamica: dinamica });
+      if (nuevoReto) c.dinamicas.push(nuevoReto);
+    }, "Oferta publicada: ya sale en el menú web").then(function () { state.promoForm = null; render(); })
+      .catch(function (e) { f.busy = false; f.err = e.message; render(); });
+  }
+  /* contadores de Ajustes y de las tarjetas, sin volver a dibujar la pantalla */
+  setInterval(function () {
+    var els = document.querySelectorAll(".promo-t[data-fin]");
+    for (var i = 0; i < els.length; i++) { var fin = Number(els[i].getAttribute("data-fin")); if (fin > ahoraSrv()) els[i].textContent = (els[i].className.indexOf("tile-t") >= 0 ? "" : "Termina en ") + resto(fin); }
+  }, 1000);
+
   function settingsHTML() {
     var rows = PRODUCTS.filter(function (p) { return !p.extra; }).map(function (p) {
       if (!sellable(p) && p.disponible !== false) {
@@ -686,6 +828,7 @@
       "<h3>Precios y disponibilidad</h3>" +
       '<div class="card prices"><table><tr><th>Producto</th><th class="r">Precio</th><th class="r"></th></tr>' + rows + "</table>" +
       '<p class="note">Se guarda al salir de cada casilla y cambia también en el menú web (hace falta internet). La cerveza es solo de la caja: se guarda en este iPad.</p></div>' +
+      "<h3>Promos del día</h3>" + promosHTML() +
       "<h3>Productos nuevos</h3>" + productosHTML() +
       "<h3>Pedidos del menú web</h3>" +
       '<div class="card"><p>' + (token() ? "Sesión de <b>" + esc(ses.usuario || "caja") + "</b>, vence el " + esc(fecha(new Date(sesExp()).toISOString())) + "." : "Sin sesión.") + "</p>" +
@@ -838,6 +981,8 @@
     if (state.fromPedido) { var wp = findPed(state.fromPedido); if (wp) sale.web = wp.folio; setEstado(state.fromPedido, "entregado", { ventaFolio: sale.folio }); state.fromPedido = null; }
     if (state.fromPend) { var pp = findPend(state.fromPend); if (pp) db.pendientes.splice(db.pendientes.indexOf(pp), 1); }
     db.shift.sales.push(sale); db.shift.next++; save();
+    /* ofertas vendidas aquí: ocupan su lugar en el servidor (los pedidos web ya lo ocuparon) */
+    if (!sale.web) sale.lines.forEach(function (l) { var p = prod(l.pid); if (p && p.promo) api("POST", "/api/promos/usar", { id: p.id, n: l.qty }).then(cargarPromos).catch(function () { toast("No se pudo apartar el lugar de la oferta (sin internet)"); }); });
     s.done = sale;
     resetTicket();
   }
@@ -1106,6 +1251,27 @@
     if (state.prodForm && find(t, '[data-act="prod-toggle"]')) { state.prodForm.disponible = !state.prodForm.disponible; return render(); }
     if (find(t, '[data-act="prod-cancel"]')) { state.prodForm = null; return render(); }
     if (find(t, '[data-act="prod-save"]')) return guardarProducto();
+    /* promos del día */
+    if (find(t, '[data-act="pr-new"]')) { nuevaPromo(); return render(); }
+    if (find(t, '[data-act="pr-cancel"]')) { state.promoForm = null; return render(); }
+    if (state.promoForm && find(t, '[data-act="pr-add"]')) {
+      var pf = state.promoForm, sv = String(pf.sel).split("|"), pq = Math.max(1, Math.min(10, Math.floor(Number(pf.qty) || 1)));
+      if (sv[0] && pf.items.length < 6) pf.items.push({ id: sv[0], opt: Number(sv[1]) || 0, qty: pq });
+      pf.err = ""; return render();
+    }
+    if (state.promoForm && (el = find(t, "[data-pritem]"))) { state.promoForm.items.splice(Number(attr(el, "data-pritem")), 1); return render(); }
+    if (state.promoForm && find(t, '[data-act="pr-guardar-reto"]')) { state.promoForm.guardarReto = !state.promoForm.guardarReto; return render(); }
+    if (find(t, '[data-act="pr-save"]')) return guardarPromo();
+    if ((el = find(t, "[data-pterm]"))) {
+      var tid = attr(el, "data-pterm");
+      guardarPromos(function (c) { c.promos.forEach(function (x) { if (x.id === tid) x.terminada = true; }); }, "Oferta terminada: ya no sale en el menú").catch(function () {});
+      return;
+    }
+    if ((el = find(t, "[data-prdin]"))) {
+      var did = attr(el, "data-prdin");
+      guardarPromos(function (c) { c.dinamicas = c.dinamicas.filter(function (x) { return x.id !== did; }); }, "Reto borrado").catch(function () {});
+      return;
+    }
     if (find(t, '[data-act="copy-backup"]')) { toast(copyText(JSON.stringify(db)) ? "Respaldo copiado: pégalo en un chat" : "No se pudo copiar"); return; }
     if (find(t, '[data-act="show-import"]')) { state.confirm = "import"; return render(); }
     if (find(t, '[data-act="do-import"]')) {
@@ -1125,10 +1291,14 @@
     if (state.prodForm && t.id === "pf-name") state.prodForm.name = t.value;
     if (state.prodForm && t.id === "pf-desc") state.prodForm.desc = t.value;
     if (state.prodForm && t.id === "pf-price") state.prodForm.price = t.value;
+    var pfi = state.promoForm, PRI = { "pr-nombre": "nombre", "pr-qty": "qty", "pr-precio": "precio", "pr-cupo": "cupo", "pr-texto": "texto" };
+    if (pfi && PRI[t.id]) pfi[PRI[t.id]] = t.value;
   });
   document.addEventListener("change", function (e) {
     var t = e.target;
     if (state.prodForm && t.id === "pf-cat") state.prodForm.cat = t.value;
+    var pfc = state.promoForm, PRC = { "pr-sel": "sel", "pr-horas": "horas", "pr-min": "minutos", "pr-din": "din" };
+    if (pfc && PRC[t.id]) { pfc[PRC[t.id]] = t.value; if (t.id === "pr-din") render(); }
     if (state.prodForm && t.id === "pf-file" && t.files && t.files[0]) achicarFoto(t.files[0]);
     if (t.getAttribute("data-price") && !SOLO_CAJA[t.getAttribute("data-price")]) {
       var cp = prod(t.getAttribute("data-price")), co = Number(t.getAttribute("data-opt")), cv = Number(t.value);
@@ -1261,6 +1431,7 @@
       ped.first = false;
       ped.list = d.pedidos;
       if (d.catalogoV != null && d.catalogoV !== db.catalogo.v) cargarCatalogo();
+      if (++promos.vueltas % 6 === 1) cargarPromos();   /* cada minuto */
       if (fresh.length) { ped.banner = fresh[fresh.length - 1].key; beep(); }
       refreshPedidos();
     }).catch(function (e) {

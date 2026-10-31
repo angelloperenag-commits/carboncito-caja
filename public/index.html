@@ -1,5 +1,6 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Menú El Carboncito</title>
+<meta name="description" content="Hamburguesas, hotdogs, salchipulpos y alitas en Temixco, Morelos. Arma tu pedido y síguelo en línea. Abierto viernes a domingo de 6 pm a 12 am.">
 <!-- que el teléfono no convierta el número en enlace azul -->
 <meta name="format-detection" content="telephone=no">
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -9,7 +10,10 @@
 <meta name="theme-color" content="#2b1a10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ultra&family=Bree+Serif&family=Oswald:wght@500;600;700&family=Baloo+2:wght@700;800&family=Archivo:wght@400;500;600&display=swap">
+<!-- las fuentes no frenan el primer dibujo: mientras llegan se ve la letra del sistema -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Ultra&family=Bree+Serif&family=Oswald:wght@500;600;700&family=Baloo+2:wght@700;800&family=Archivo:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ultra&family=Bree+Serif&family=Oswald:wght@500;600;700&family=Baloo+2:wght@700;800&family=Archivo:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ultra&family=Bree+Serif&family=Oswald:wght@500;600;700&family=Baloo+2:wght@700;800&family=Archivo:wght@400;500;600&display=swap"></noscript>
 <style>
 /* Layout: una columna para el teléfono (centrada en computadora) sobre una pared de cal;
    letrero de madera, jarritos y papel picado enmarcan la parte de arriba y una franja de ladrillo cierra abajo */
@@ -223,6 +227,7 @@ section { display: grid; gap: 12px; scroll-margin-top: 76px; }
 .slot-pic { display: block; width: 46px; height: 58px; margin: auto; border-radius: 10px 10px 14px 14px; border: 2px dashed rgba(91, 52, 26, .35); }
 .item:active { transform: scale(.98); box-shadow: 0 1px 0 rgba(91, 52, 26, .08); }
 .item .pic { width: 84px; height: 70px; filter: drop-shadow(0 4px 5px rgba(60, 30, 10, .22)); display: grid; align-items: center; }
+.mini-img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .item .pic svg { width: 100%; height: 100%; }
 .item .txt { min-width: 0; }
 .item .nm { display: block; overflow-wrap: anywhere; font-family: var(--font-name); font-weight: 700; font-size: 20px; letter-spacing: .03em; text-transform: uppercase; line-height: 1.15; color: var(--ink); }
@@ -498,6 +503,32 @@ button.prow:focus-visible, button.chip:focus-visible, .stepper button:focus-visi
 .seg-resumen p { display: flex; justify-content: space-between; gap: 10px; margin: 4px 0; font-size: 15px; }
 .seg-resumen small { color: var(--ink-soft); }
 .seg-resumen em { font-style: normal; font-weight: 700; color: var(--terra); white-space: nowrap; }
+/* promo del día: alerta abajo (fija, no mueve la página) con su contador */
+.promo-alerta { position: fixed; z-index: 16; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.promo-alerta.abierta { right: max(12px, env(safe-area-inset-right, 0px)); max-width: 480px; margin: 0 auto; max-height: 70vh; overflow-y: auto;
+  padding: 12px 14px 14px; border-radius: 18px; background: #2b1a10; color: #fff3e0; box-shadow: 0 10px 30px rgba(40, 20, 8, .45); border: 2px solid #f2b33c; }
+body.has-cart .promo-alerta { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+body.locked .promo-alerta { display: none; }
+.pa-head { display: flex; align-items: center; gap: 8px; color: #f2b33c; font: 700 15px var(--font-name); letter-spacing: .08em; text-transform: uppercase; }
+.pa-x { all: unset; cursor: pointer; margin-left: auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: rgba(255, 243, 224, .12); color: #fff3e0; font-size: 22px; }
+.pa-promo { padding-top: 10px; display: grid; gap: 4px; }
+.pa-promo + .pa-promo { border-top: 1px solid rgba(255, 243, 224, .18); margin-top: 10px; }
+.pa-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pa-name { font: 700 22px/1.1 var(--font-name); text-transform: uppercase; letter-spacing: .03em; }
+.pa-time { font-size: 13px; color: #f6d9a8; white-space: nowrap; }
+.pa-time b, .pa-pill b { font-variant-numeric: tabular-nums; color: #fff; }
+.pa-items, .pa-din, .pa-nota { margin: 0; font-size: 14.5px; }
+.pa-din { color: #f2b33c; font-weight: 600; }
+.pa-nota { color: #f6d9a8; }
+.pa-precio { margin: 0; }
+.pa-precio b { font: 700 28px var(--font-name); color: #fff; }
+.pa-precio s { color: #c9a98c; margin-left: 6px; }
+.pa-add { width: 100%; margin-top: 6px; }
+.pa-pill { all: unset; box-sizing: border-box; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; max-width: 62vw; padding: 10px 14px; border-radius: 999px;
+  background: #2b1a10; color: #fff3e0; border: 2px solid #f2b33c; box-shadow: 0 8px 20px rgba(40, 20, 8, .4); font: 700 14px var(--font-name); letter-spacing: .04em; text-transform: uppercase; }
+.pa-pill svg { color: #f2b33c; flex: none; }
+.pa-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pa-pill:focus-visible, .pa-x:focus-visible { outline: 2px solid #f2b33c; outline-offset: 2px; }
 /* botón para volver a la sala del pedido */
 .mi-pedido {
   all: unset; box-sizing: border-box; cursor: pointer; position: fixed; z-index: 14;
@@ -730,10 +761,10 @@ body.has-cart .mi-pedido { bottom: calc(84px + env(safe-area-inset-bottom, 0px))
   <span class="cb-total" id="cb-total">$0</span>
 </button>
 <button class="mi-pedido" id="mi-pedido" type="button" hidden><span>Mi pedido <b></b></span><small>Ver estado</small></button>
+<div class="promo-alerta" id="promo-alerta" role="region" aria-label="Promo del día" hidden></div>
 
 <!-- librerías servidas desde el propio sitio (qrcode-generator 1.4.4 y jsPDF 4.2.1, verificadas con el SRI de cdnjs) -->
-<script src="js/qrcode.min.js"></script>
-<script src="js/jspdf.umd.min.js" defer></script>
+<!-- qrcode-generator se carga solo en computadora (para el QR) y jsPDF solo si el cliente pide su ticket en PDF -->
 <script>
 /* =========================================================
    INGREDIENTES
@@ -942,6 +973,10 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 /* se puede vender: no es borrador, está disponible y todas sus opciones tienen precio */
 const sellable = p => !!p && !p.draft && p.disponible !== false && p.prices.every(r => typeof r[1] === "number");
 let ALL = Object.values(MENU).flat();
+/* iconos de la lista ya hechos (img/mini/<id>.webp, sacados de las mismas capas). Si cambia cómo se ve un producto, hay que volver a generarlos. */
+const MINIS = new Set(["alicombo", "alitas-mixto", "alitas", "bbq", "coca-cola", "combo-carboncito", "combo-domi", "combo-rico", "hawaiana", "hotdog-tocino", "hotdog", "jarritos-limon", "jarritos-manzana", "jarritos-pina", "jarritos-tamarindo", "jarritos-uva", "loba", "medio-alicombo", "monstruo", "papas", "salchipulpos", "sencilla"]);
+/* promos del día vigentes, como productos que se pueden pedir (una por pedido) */
+let PROMOS = [];
 const uniq = a => [...new Set(a)];
 const joinY = a => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " y " + a[a.length - 1];
 const listPrice = p => p.combo ? p.prices[0][1] : Math.min(...p.prices.map(r => r[1]));
@@ -974,7 +1009,7 @@ function aplicarCatalogo(c) {
     MENU[x.cat].push({ id: x.id, name: String(x.name), desc: String(x.desc || ""), lead: String(x.desc || x.name), icon: "i-wings", builder: "drink",
       file: /^\/api\/img\/[a-z0-9-]+$/.test(x.img || "") ? x.img : null, prices: [["", Number(x.price)]], recipe: [], fixed: [], extra: true, disponible: true });
   });
-  ALL = Object.values(MENU).flat();
+  ALL = Object.values(MENU).flat().concat(PROMOS);
   catalogoV = c.v || 0;
   return true;
 }
@@ -993,6 +1028,92 @@ function cargarCatalogo() {
     return true;
   }).catch(() => false);
 }
+/* ---------- promos del día: alerta abajo con su contador ----------
+   Las crea la caja. Se muestran abiertas la primera vez que el cliente las ve; con la × quedan como una pastilla.
+   El servidor dice la hora (para que el contador no dependa del reloj del teléfono), cuántos lugares quedan y cobra el precio. */
+const PROMO_KEY = "carbon-promos";
+let promoDesfase = 0, promoTimer = 0;
+const promoAhora = () => Date.now() + promoDesfase;
+const promoResumen = pr => pr.items.map(it => `${it.qty > 1 ? it.qty + "× " : ""}${it.name}${it.optLabel ? " (" + it.optLabel.toLowerCase() + ")" : ""}`).join(" + ");
+function promoDinamica(pr) {
+  const d = pr.dinamica;
+  if (d.tipo === "primeros") return d.quedan ? `Solo los primeros ${d.cupo} clientes · quedan ${d.quedan}` : "Ya se acabaron los lugares";
+  if (d.tipo === "primero") return d.quedan ? "El primero que la pida se la lleva" : "Ya se la llevaron";
+  return d.quedan ? `Reto en el local: ${d.texto}` : "Ya hubo ganador";
+}
+function promoResto(fin) {
+  const s = Math.max(0, Math.round((fin - promoAhora()) / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${m}:${String(ss).padStart(2, "0")}`;
+}
+function aplicarPromos(d) {
+  if (!d || !Array.isArray(d.promos)) return;
+  if (typeof d.ahora === "number") promoDesfase = d.ahora - (d.recibido || Date.now());
+  PROMOS = d.promos.filter(pr => pr && /^p-[a-z0-9]+$/.test(pr.id) && pr.fin > promoAhora() && Array.isArray(pr.items)).map(pr => ({
+    id: pr.id, name: String(pr.nombre || "Oferta flash"), desc: promoResumen(pr), lead: promoResumen(pr), icon: "i-wings", builder: "promo",
+    prices: [["", Number(pr.precio)]], recipe: [], fixed: [], promo: pr, disponible: !!(pr.vigente && pr.enLinea),
+  }));
+  ALL = Object.values(MENU).flat().concat(PROMOS);
+}
+try { aplicarPromos(JSON.parse(localStorage.getItem(PROMO_KEY) || "null")); } catch (e) { /* sin copia */ }
+function cargarPromos() {
+  return fetch("/api/promos", { cache: "no-store" }).then(r => r.json()).then(d => {
+    if (!d || !d.ok) return;
+    d.recibido = Date.now();
+    aplicarPromos(d);
+    try { localStorage.setItem(PROMO_KEY, JSON.stringify(d)); } catch (e) { /* sin espacio */ }
+    /* una oferta que ya no se puede pedir sale del carrito */
+    const antes = cart.length; cart = cart.filter(l => prod(l.id));
+    if (cart.length !== antes) { saveCart(); refreshCartLines(); }
+    pintarPromos();
+  }).catch(() => {});
+}
+let promoAbierta = null;
+function promoVista(id) { try { return (sessionStorage.getItem("promo-vista") || "").split(",").includes(id); } catch (e) { return false; } }
+function marcarVista(id) { try { const v = (sessionStorage.getItem("promo-vista") || "").split(",").filter(Boolean); if (!v.includes(id)) v.push(id); sessionStorage.setItem("promo-vista", v.join(",")); } catch (e) { /* sin sesión */ } }
+const FUEGO = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2c1 3.5-1.5 5.3-1.5 8 0 1.4 1 2.5 2.3 2.5 1.6 0 2.4-1.4 2.2-3.3C17.6 11 19 13.4 19 15.8 19 19.8 15.9 22 12 22s-7-2.4-7-6.4C5 10.4 9.6 7.6 12 2z"/></svg>`;
+function pintarPromos() {
+  const box = document.getElementById("promo-alerta"); if (!box) return;
+  const vivas = PROMOS.filter(p => p.promo.fin > promoAhora() && (p.promo.vigente || p.promo.dinamica.tipo === "reto"));
+  clearInterval(promoTimer); promoTimer = 0;
+  if (!vivas.length) { box.hidden = true; box.innerHTML = ""; document.body.classList.remove("has-promo"); return; }
+  if (promoAbierta === null) promoAbierta = vivas.some(p => !promoVista(p.id));
+  const enCarrito = id => cart.some(l => l.id === id);
+  box.hidden = false; document.body.classList.add("has-promo");
+  box.className = "promo-alerta" + (promoAbierta ? " abierta" : "");
+  box.innerHTML = promoAbierta
+    ? `<div class="pa-head">${FUEGO}<b>${vivas.length > 1 ? "Promos del día" : "Promo del día"}</b><button type="button" class="pa-x" data-pa="cerrar" aria-label="Cerrar la promo">×</button></div>` +
+      vivas.map(p => { const pr = p.promo, puede = pr.enLinea && pr.vigente;
+        return `<div class="pa-promo"><div class="pa-top"><b class="pa-name">${esc(p.name)}</b><span class="pa-time">Termina en <b data-fin="${pr.fin}">${promoResto(pr.fin)}</b></span></div>
+          <p class="pa-items">${esc(p.desc)}</p>
+          <p class="pa-precio"><b>${money(pr.precio)}</b>${pr.normal > pr.precio ? ` <s>${money(pr.normal)}</s>` : ""}</p>
+          <p class="pa-din">${esc(promoDinamica(pr))}</p>
+          ${puede ? `<button type="button" class="btn add pa-add" data-pa-add="${esc(p.id)}">${enCarrito(p.id) ? "Ya está en tu pedido · Ver" : "Agregar a mi pedido"}</button>`
+            : pr.dinamica.tipo === "reto" && pr.dinamica.quedan ? `<p class="pa-nota">Se gana en Jerusalén 8, Temixco. Pide la promo en el mostrador.</p>` : ""}</div>`; }).join("")
+    : `<button type="button" class="pa-pill" data-pa="abrir">${FUEGO}<span>${esc(vivas[0].name)}${vivas.length > 1 ? ` +${vivas.length - 1}` : ""}</span><b data-fin="${vivas[0].promo.fin}">${promoResto(vivas[0].promo.fin)}</b></button>`;
+  promoTimer = setInterval(() => {
+    let vencio = false;
+    box.querySelectorAll("[data-fin]").forEach(el => { const fin = +el.dataset.fin; if (fin <= promoAhora()) vencio = true; else el.textContent = promoResto(fin); });
+    if (vencio) cargarPromos();
+  }, 1000);
+}
+function accionPromo(t) {
+  const pa = t.closest("[data-pa]");
+  if (pa) {
+    promoAbierta = pa.dataset.pa === "abrir";
+    if (!promoAbierta) PROMOS.forEach(p => marcarVista(p.id));
+    pintarPromos(); return true;
+  }
+  const add = t.closest("[data-pa-add]");
+  if (add) {
+    const p = prod(add.dataset.paAdd);
+    if (!p) { cargarPromos(); return true; }
+    /* una por pedido */
+    if (!cart.some(l => l.id === p.id)) { addToCart(p.id, 0, [], [], 1, [], null); bump(); }
+    PROMOS.forEach(x => marcarVista(x.id)); promoAbierta = false; pintarPromos();
+    openSheet(bar, true); return true;
+  }
+  return false;
+}
 /* lista: solo lo que se puede vender; una sección sin nada a la venta (combos) no se muestra */
 function pintarLista(minis) {
 document.querySelectorAll(".items").forEach(box => {
@@ -1000,13 +1121,13 @@ document.querySelectorAll(".items").forEach(box => {
   const slots = box.dataset.cat === "drinks" ? Math.max(0, BEBIDA_ESPACIOS - list.length) : 0;
   sec.hidden = !list.length && !slots;
   document.querySelectorAll(`[data-sec="${sec.id}"]`).forEach(a => { a.hidden = sec.hidden; });
-  box.innerHTML = list.map(p => `<button class="item" type="button" data-id="${p.id}" aria-haspopup="dialog">
-      <span class="pic" data-mini="${p.id}"></span>
+  box.innerHTML = list.map((p, i) => `<button class="item" type="button" data-id="${p.id}" aria-haspopup="dialog">
+      ${MINIS.has(p.id) ? `<span class="pic"><img class="mini-img" src="img/mini/${p.id}.webp" alt="" width="84" height="70" decoding="async"${i > 3 ? ' loading="lazy"' : ""}></span>` : `<span class="pic" data-mini="${p.id}"></span>`}
       <span class="txt"><span class="nm">${esc(p.name)}${p.x ? `<span class="x">${p.x}</span>` : ""}</span><span class="sub">${esc(p.desc)}</span></span>
       <span class="go"><span class="from">${!p.combo && p.prices.length > 1 ? "<small>desde</small>" : ""}${money(listPrice(p))}</span><span class="plus" aria-hidden="true">+</span></span>
     </button>`).join("") + Array(slots).fill(0).map(slotHTML).join("");
 });
-  if (minis) { ALL.flatMap(filesOf).forEach(loadImg); refreshMinis(); }
+  if (minis) { ALL.filter(p => !MINIS.has(p.id)).flatMap(filesOf).forEach(loadImg); refreshMinis(); }
 }
 pintarLista();
 
@@ -1225,7 +1346,7 @@ function refreshMinis() {
     const h = miniHTML(prod(el.dataset.mini)); if (h) { el.innerHTML = h; el.dataset.done = ""; }
   });
 }
-const picHTML = (p, cls) => { const h = miniHTML(p); return `<span class="${cls}" data-mini="${p.id}"${h ? " data-done" : ""}>${h || ""}</span>`; };
+const picHTML = (p, cls) => { if (p.promo) { const f = p.promo.items.find(it => MINIS.has(it.id)); return `<span class="${cls}">${f ? `<img class="mini-img" src="img/mini/${f.id}.webp" alt="" width="84" height="70" decoding="async">` : ""}</span>`; } if (MINIS.has(p.id)) return `<span class="${cls}"><img class="mini-img" src="img/mini/${p.id}.webp" alt="" width="84" height="70" decoding="async"></span>`; const h = miniHTML(p); return `<span class="${cls}" data-mini="${p.id}"${h ? " data-done" : ""}>${h || ""}</span>`; };
 
 /* ---------- dibujo: crea, mueve y retira capas según el pedido ---------- */
 let fb = null;
@@ -1356,6 +1477,7 @@ function partText(c, ps) {
   return c.label + (bits.length ? ": " + bits.join(", ") : "");
 }
 function custParts(p, s) {
+  if (p.promo) return [p.desc];
   if (p.parts) return p.parts.map((c, i) => partText(c, s.comp[i]));
   return [
     p.prices.length > 1 ? p.prices[s.opt][0] : "",
@@ -1539,7 +1661,7 @@ function cartLinesHTML() {
       <div class="ltxt"><b>${esc(p.name)}</b>${parts.length ? `<span class="cust">${esc(parts.join(" · "))}</span>` : ""}<em>${money(price * l.qty)}</em></div>
       <div class="lctl">
         <div class="stepper sm"><button type="button" data-line="-1" aria-label="Quitar uno">−</button><output>${l.qty}</output><button type="button" data-line="1" aria-label="Agregar uno">+</button></div>
-        <span><button type="button" class="edit" data-edit aria-label="Editar ${esc(p.name)}">Editar</button><button type="button" class="remove" data-remove aria-label="Quitar ${esc(p.name)} del pedido">Quitar</button></span>
+        <span>${p.promo ? "" : `<button type="button" class="edit" data-edit aria-label="Editar ${esc(p.name)}">Editar</button>`}<button type="button" class="remove" data-remove aria-label="Quitar ${esc(p.name)} del pedido">Quitar</button></span>
       </div>
     </div>`;
   }).join("") + `<div class="subtotal"><span>Total</span><b id="cart-total">${totalTxt(totals())}</b></div>`;
@@ -1690,9 +1812,17 @@ function ticketPDF(s) {
   return doc;
 }
 let lastOrder = null;
+/* jsPDF pesa 420 KB: se carga solo cuando el cliente elige ticket en PDF (o lo pide) */
+let pdfLib = null;
+function cargarPDF() {
+  if (window.jspdf) return Promise.resolve();
+  if (!pdfLib) pdfLib = new Promise((ok, mal) => { const s = document.createElement("script"); s.src = "js/jspdf.umd.min.js"; s.onload = ok; s.onerror = () => { pdfLib = null; mal(new Error("pdf")); }; document.head.appendChild(s); });
+  return pdfLib;
+}
 function saveTicket() {
-  if (!lastOrder) return false;
-  try { ticketPDF(lastOrder).save(`ticket-el-carboncito-${lastOrder.folio}.pdf`); return true; } catch (e) { console.error(e); return false; }
+  if (!lastOrder) return Promise.resolve(false);
+  const o = lastOrder;
+  return cargarPDF().then(() => { ticketPDF(o).save(`ticket-el-carboncito-${o.folio}.pdf`); return true; }).catch(e => { console.error(e); return false; });
 }
 function cartProblems() {
   const errs = [];
@@ -1837,7 +1967,7 @@ function consultarSeguimiento() {
       if (!fin && !document.hidden) s.timer = setTimeout(consultarSeguimiento, 20000);
     });
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { if (seg) consultarSeguimiento(); cargarCatalogo(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { if (seg) consultarSeguimiento(); cargarCatalogo(); cargarPromos(); } });
 function pasosHTML(p) {
   if (p.estado === "rechazado") return `<div class="seg-cancel">El negocio canceló tu pedido. Si tienes dudas, llámanos al <a href="tel:7771138935">777 113 8935</a>.</div>`;
   const i = PASOS_SEG.indexOf(p.estado);
@@ -1967,6 +2097,7 @@ function closeSheet() {
 const setPressed = (sel_, on) => document.querySelectorAll(sel_).forEach(b => on(b));
 document.addEventListener("click", e => {
   const t = e.target;
+  if (accionPromo(t)) return;
   const btn = t.closest(".item:not(.slot)"); if (btn) return openSheet(btn);
   if (t.closest("#cartbar")) return openSheet(bar, true);
   const mp = t.closest("#mi-pedido"); if (mp) return abrirSeguimiento(mp.dataset.key, mp.dataset.t);
@@ -2080,7 +2211,7 @@ document.addEventListener("click", e => {
     const l = cart.find(x => x.key === line.dataset.key); if (!l) return;
     if (t.closest("[data-edit]")) return swapSheet(false, prod(l.id), { opt: l.opt, sauces: l.sauces, off: l.off, comp: (l.comp || []).map(c => ({ sauces: [...c.sauces], off: [...c.off], opcion: c.opcion || "", alas: c.alas ? Object.assign({}, c.alas) : null })), alas: l.alas ? Object.assign({}, l.alas) : {}, qty: l.qty, editKey: l.key });
     const d = t.closest("[data-line]");
-    if (d) { l.qty += +d.dataset.line; if (l.qty < 1) cart = cart.filter(x => x !== l); }
+    if (d) { l.qty += +d.dataset.line; if (l.qty < 1) cart = cart.filter(x => x !== l); if (prod(l.id) && prod(l.id).promo && l.qty > 1) l.qty = 1;   /* la promo es una por pedido */ }
     else if (t.closest("[data-remove]")) cart = cart.filter(x => x !== l);
     else return;
     saveCart(); refreshCartLines(); return;
@@ -2088,6 +2219,7 @@ document.addEventListener("click", e => {
   const sg = t.closest("[data-seg]");
   if (sg) {
     form[sg.dataset.seg] = sg.dataset.val; saveForm();
+    if (form.ticket === "pdf") cargarPDF().catch(() => {});   /* listo para cuando se envíe el pedido */
     sheet.querySelectorAll(`[data-seg="${sg.dataset.seg}"]`).forEach(b => { const on = b === sg; b.classList.toggle("on", on); b.setAttribute("aria-checked", on); });
     document.getElementById("addr-box").hidden = form.mode !== "domicilio";
     document.getElementById("pickup-box").hidden = form.mode !== "recoger";
@@ -2112,7 +2244,8 @@ document.addEventListener("click", e => {
     try { navigator.clipboard.writeText(CLABE).then(ok, fallback); } catch (err) { fallback(); }
     return;
   }
-  if (t.closest("#get-ticket")) { if (!saveTicket()) t.closest("#get-ticket").textContent = "No se pudo crear el PDF"; return; }
+  const gt = t.closest("#get-ticket");
+  if (gt) { gt.textContent = "Preparando tu PDF…"; saveTicket().then(ok => { gt.textContent = ok ? "Descargar mi ticket (PDF)" : "No se pudo crear el PDF"; }); return; }
   if (t.closest("#send")) {
     const errs = cartProblems(), box = document.getElementById("cart-err");
     sheet.querySelectorAll(".bad").forEach(x => x.classList.remove("bad"));
@@ -2139,16 +2272,25 @@ document.addEventListener("input", e => {
 });
 renderBar();
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
-/* precarga: primero la hamburguesa, luego lo demás, de a poco y en ratos libres */
+/* precarga de las capas grandes: la lista usa iconos ya hechos (img/mini), así que las fotos de cada capa
+   se piden hasta que el cliente empieza a usar la página (toca, desliza o escribe), de a poco y en ratos libres.
+   Al tocar un producto se piden primero las suyas. */
 (function () {
-  const q = uniq(ALL.flatMap(filesOf));
-  const idle = window.requestIdleCallback || ((f) => setTimeout(f, 120));
-  const next = () => { q.splice(0, 6).forEach(loadImg); if (q.length) idle(next, { timeout: 400 }); };
-  next();
+  let empezo = false;
+  const empezar = () => {
+    if (empezo) return; empezo = true;
+    const q = uniq(ALL.flatMap(filesOf));
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 120));
+    const next = () => { q.splice(0, 4).forEach(loadImg); if (q.length) idle(next, { timeout: 600 }); };
+    next();
+  };
+  ["pointerdown", "touchstart", "scroll", "keydown"].forEach(ev => addEventListener(ev, empezar, { once: true, passive: true }));
+  document.addEventListener("pointerdown", e => { const it = e.target.closest && e.target.closest(".item[data-id]"); const p = it && prod(it.dataset.id); if (p) filesOf(p).forEach(loadImg); }, { passive: true });
 })();
 
 /* catálogo vigente y, si la dirección trae un pedido (su enlace o la app de Inicio), su sala de seguimiento */
 cargarCatalogo();
+pintarPromos(); cargarPromos();
 (function () {
   const q = new URLSearchParams(location.search), key = q.get("pedido") || "", t = q.get("t") || "";
   if (/^dia\/\d{4}-\d{2}-\d{2}\/\d{14}-[a-z0-9]{1,8}$/.test(key)) {
@@ -2192,7 +2334,11 @@ document.getElementById("copy").addEventListener("click", () => {
 });
 
 /* QR para computadora */
-try { const q = qrcode(0, "M"); q.addData(ARTIFACT_URL); q.make(); document.getElementById("qr").innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true }); } catch (e) {}
+if (matchMedia("(min-width: 1080px) and (hover: hover)").matches) {
+  const s = document.createElement("script"); s.src = "js/qrcode.min.js";
+  s.onload = () => { try { const q = qrcode(0, "M"); q.addData(ARTIFACT_URL); q.make(); document.getElementById("qr").innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true }); } catch (e) { /* sin QR */ } };
+  document.head.appendChild(s);
+}
 
 
 

@@ -186,6 +186,39 @@ prueba("enlace que no es de Google se descarta", r.status === 200 && (await stor
 r = await dom({ mapa: "javascript:alert(1)" });
 prueba("sin dirección, GPS ni enlace válido se pide la dirección", r.status === 400);
 
+console.log("Promos del día");
+prueba("sin sesión no se crean ofertas", (await api("POST", "/api/promos", { promos: [] })).status === 401);
+const promoMala = await api("POST", "/api/promos", { promos: [{ id: "p-alitas1", items: [{ id: "alitas", opt: 0, qty: 1 }], precio: 80, duracionMin: 60, dinamica: { tipo: "primeros", cupo: 3 } }] }, caja);
+prueba("una oferta no puede llevar algo con sabor a elegir", promoMala.status === 400, promoMala.d);
+const cortaMala = await api("POST", "/api/promos", { promos: [{ id: "p-corta1", items: [{ id: "sencilla", opt: 0, qty: 1 }], precio: 40, duracionMin: 1, dinamica: { tipo: "primeros", cupo: 3 } }] }, caja);
+prueba("duración menor a 5 minutos se rechaza", cortaMala.status === 400);
+const creada = await api("POST", "/api/promos", {
+  promos: [
+    { id: "p-flash01", nombre: "", items: [{ id: "sencilla", opt: 0, qty: 1 }, { id: "jarritos-uva", opt: 0, qty: 1 }], precio: 70, duracionMin: 90, dinamica: { tipo: "primeros", cupo: 2 } },
+    { id: "p-catrin1", nombre: "Catrín del día", items: [{ id: "alicombo", opt: 0, qty: 1 }], precio: 150, duracionMin: 120, dinamica: { tipo: "reto", texto: "El primero que llegue disfrazado de catrín" } },
+  ],
+  dinamicas: [{ id: "d-catrin1", texto: "El primero que llegue disfrazado de catrín" }, { id: "d-rima001", texto: "El primero que cante una rima completa" }],
+}, caja);
+prueba("la caja crea ofertas y dinámicas", creada.status === 200 && creada.d.promos.length === 2 && creada.d.dinamicas.length === 2, creada.d);
+const flash = creada.d.promos.find((p) => p.id === "p-flash01");
+prueba("sin nombre se llama Oferta flash; dura lo que dijo la caja", flash.nombre === "Oferta flash" && Math.abs(flash.fin - flash.inicio - 90 * 60e3) < 1000 && flash.normal === 85, flash);
+const pub = await api("GET", "/api/promos");
+prueba("el menú ve las ofertas vigentes, sin las dinámicas guardadas", pub.d.promos.length === 2 && !pub.d.dinamicas && typeof pub.d.ahora === "number");
+const conPromo = (q) => ({ items: [{ id: "p-flash01", qty: q }, { id: "papas", opt: 0, qty: 1 }], cliente: cliente() });
+const dos = await api("POST", "/api/pedidos", conPromo(2));
+prueba("la oferta es una por pedido", dos.status === 400, dos.d);
+const pp1 = await api("POST", "/api/pedidos", conPromo(1));
+const lineaP = pp1.d.pedido && (await store.get(pp1.d.pedido)).lines[0];
+prueba("se cobra el precio de la oferta y la cocina ve qué lleva", pp1.status === 200 && pp1.d.total === 70 + 30 && lineaP.componentes.map((c) => c.label).join(" | ") === "1× Sencilla (Con papas) | 1× Jarritos Uva", pp1.d);
+await api("POST", "/api/promos/usar", { id: "p-flash01", n: 1 }, caja);
+const tercero = await api("POST", "/api/pedidos", conPromo(1));
+prueba("con los 2 lugares ocupados (web + caja) ya no se puede", tercero.status === 400 && /ya no quedan/.test(tercero.d.error), tercero.d);
+const reto = await api("POST", "/api/pedidos", { items: [{ id: "p-catrin1", qty: 1 }], cliente: cliente() });
+prueba("un reto en el local no se pide en línea", reto.status === 400, reto.d);
+const terminar = await api("POST", "/api/promos", { promos: [Object.assign({}, creada.d.promos.find((p) => p.id === "p-catrin1"), { terminada: true }), { id: "p-flash01", items: flash.items, precio: 70, dinamica: flash.dinamica }], dinamicas: creada.d.dinamicas }, caja);
+prueba("terminar una oferta la quita del menú", terminar.status === 200 && (await api("GET", "/api/promos")).d.promos.every((p) => p.id !== "p-catrin1"));
+prueba("una oferta que ya terminó no se cobra", (await api("POST", "/api/pedidos", { items: [{ id: "p-nadaaa1", qty: 1 }], cliente: cliente() })).d.error === "La oferta ya terminó.");
+
 console.log("Varios clientes a la vez (20 pedidos simultáneos, IPs distintas)");
 const t0 = Date.now();
 const lote = await Promise.all(Array.from({ length: 20 }, (_, i) => api("POST", "/api/pedidos", pedidoSencilla({ cliente: cliente({ name: "Carga " + i }) }))));

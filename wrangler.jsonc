@@ -12,11 +12,11 @@
   },
   "observability": { "enabled": true },
   "d1_databases": [
-    { "binding": "DB", "database_name": "carboncito", "database_id": "PENDIENTE-ID-PRODUCCION" }
+    { "binding": "DB", "database_name": "carboncito", "database_id": "4990656f-b11e-4250-a5af-df78915e1864" }
   ],
   "previews": {
     "d1_databases": [
-      { "binding": "DB", "database_name": "carboncito-pruebas", "database_id": "PENDIENTE-ID-PRUEBAS" }
+      { "binding": "DB", "database_name": "carboncito-pruebas", "database_id": "6519b638-bdf4-4d5b-9bd0-af57c7991f6c" }
     ]
   }
 }

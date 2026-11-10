@@ -656,7 +656,7 @@ export async function handle(req, store, cfg, ip = "") {
     }
 
     /* ---- caja ---- */
-    if (!cfg.password) return json({ error: "Falta configurar CAJA_PASSWORD en Netlify." }, 500);
+    if (!cfg.password) return json({ error: "Falta poner la contraseña de la caja (CAJA_PASSWORD) en el servidor." }, 500);
     const intentos = ip ? await claveIP(ip, "intentos/") : "";
     if (req.method === "POST" && ruta === "/api/caja/login") {
       const espera = await bloqueado(store, intentos);

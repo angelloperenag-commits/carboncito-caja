@@ -1,7 +1,7 @@
 /* Pruebas del servidor (shared/core.mjs) con un almacén en memoria: node dev/pruebas.mjs
    Con el almacén de Cloudflare (D1 sobre SQLite local): ALMACEN=d1 node dev/pruebas.mjs
    Cubre catálogo compartido, cambio de precio, Alicombo, seguimiento privado, avisos push y ubicación. */
-import { handle, notificar, CATALOG } from "../shared/core.mjs";
+import { handle, notificar, CATALOG, HORARIO_BASE, fechaMx } from "../shared/core.mjs";
 import { almacenD1 } from "../shared/almacen-d1.mjs";
 import { d1Local } from "./d1-local.mjs";
 
@@ -228,6 +228,19 @@ const lote = await Promise.all(Array.from({ length: 20 }, (_, i) => api("POST", 
 const keys = new Set(lote.map((x) => x.d.pedido));
 prueba(`20 pedidos guardados sin perder ninguno (${Date.now() - t0} ms en memoria)`, lote.every((x) => x.status === 200) && keys.size === 20);
 prueba("folios distintos aunque lleguen al mismo tiempo", new Set(lote.map((x) => x.d.folio)).size === 20, lote.map((x) => x.d.folio));
+
+console.log("\nHorario del local");
+const hBase = await api("GET", "/api/catalogo");
+prueba("sin cambios el menú recibe el horario de siempre (viernes a domingo, 6 pm a 12 am)", JSON.stringify(hBase.d.horario.semana) === JSON.stringify(HORARIO_BASE.semana));
+const manana = fechaMx(Date.now() + 864e5), antier = fechaMx(Date.now() - 3 * 864e5);
+const semanaNueva = HORARIO_BASE.semana.slice(); semanaNueva[4] = ["17:00", "23:00"];
+const hGuardado = await api("POST", "/api/catalogo", { precios: {}, agotado: {}, extra: [], horario: { semana: semanaNueva, especiales: [{ fecha: manana, cerrado: true }, { fecha: antier, cerrado: true }, { fecha: manana, abre: "10:00", cierra: "12:00" }] } }, caja);
+prueba("la caja guarda días y días especiales; los pasados y repetidos se quitan", hGuardado.status === 200 && hGuardado.d.horario.semana[4][0] === "17:00" && hGuardado.d.horario.especiales.length === 1 && hGuardado.d.horario.especiales[0].cerrado === true, hGuardado.d);
+prueba("el menú lo ve", (await api("GET", "/api/catalogo")).d.horario.especiales[0].fecha === manana);
+const hMalo = await api("POST", "/api/catalogo", { precios: {}, agotado: {}, extra: [], horario: { semana: [["25:00", "18:00"]], especiales: [] } }, caja);
+prueba("horas no válidas se rechazan", hMalo.status === 400 && /domingo/.test(hMalo.d.error), hMalo.d);
+const hViejo = await api("POST", "/api/catalogo", { precios: {}, agotado: {}, extra: [] }, caja);
+prueba("una caja vieja que no manda horario no lo borra", hViejo.d.horario.semana[4][0] === "17:00");
 
 console.log(`\n${ok} correctas, ${mal} con error`);
 process.exitCode = mal ? 1 : 0;

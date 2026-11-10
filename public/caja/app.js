@@ -145,7 +145,7 @@
   var SOLO_CAJA = { cerveza: 1 };
   if (!db.catalogo) db.catalogo = { v: 0, precios: {}, agotado: {}, extra: [] };
   function aplicarCatalogo(c) {
-    db.catalogo = { v: c.v || 0, precios: c.precios || {}, agotado: c.agotado || {}, extra: c.extra || [], tema: c.tema || "" };
+    db.catalogo = { v: c.v || 0, precios: c.precios || {}, agotado: c.agotado || {}, extra: c.extra || [], tema: c.tema || "", horario: c.horario || null };
     PRODUCTS = PRODUCTS.filter(function (p) { return !p.extra; });
     /* los productos nuevos desactivados se quedan (los pedidos viejos los nombran), pero no se venden */
     db.catalogo.extra.forEach(function (x) {
@@ -172,7 +172,9 @@
     var c = JSON.parse(JSON.stringify(db.catalogo));
     cambiar(c);
     toast("Guardando…");
-    return api("POST", "/api/catalogo", { precios: c.precios, agotado: c.agotado, extra: c.extra, tema: c.tema || "" }).then(function (d) {
+    var envio = { precios: c.precios, agotado: c.agotado, extra: c.extra, tema: c.tema || "" };
+    if (c.horario) envio.horario = c.horario;
+    return api("POST", "/api/catalogo", envio).then(function (d) {
       aplicarCatalogo(d); save(); toast(ok);
       var a = document.activeElement;
       if (!(a && a.getAttribute && a.getAttribute("data-price"))) render();
@@ -822,6 +824,44 @@
     for (var i = 0; i < els.length; i++) { var fin = Number(els[i].getAttribute("data-fin")); if (fin > ahoraSrv()) els[i].textContent = (els[i].className.indexOf("tile-t") >= 0 ? "" : "Termina en ") + resto(fin); }
   }, 1000);
 
+  /* =========================================================
+     HORARIO DEL LOCAL: días y horas de cada semana, más días especiales (no abrimos u otro horario).
+     Se guarda con el catálogo y el menú web lo muestra. 0 = domingo; "24:00" es medianoche
+     (en las casillas de hora se ve como 12:00 am).
+     ========================================================= */
+  var HORARIO_BASE = { semana: [["18:00", "24:00"], null, null, null, null, ["18:00", "24:00"], ["18:00", "24:00"]], especiales: [] };
+  var DIAS_H = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  function horario() { return db.catalogo.horario || HORARIO_BASE; }
+  function hora12(s) { var h = Number(s.slice(0, 2)) % 24; return (h % 12 || 12) + ":" + s.slice(3) + " " + (h >= 12 ? "pm" : "am"); }
+  function deCasilla(v) { return v === "00:00" ? "24:00" : v; }
+  function aCasilla(v) { return v === "24:00" ? "00:00" : v; }
+  function hoyTxt() { var d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function fechaCorta(f) { var p = f.split("-"); return fecha(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12).toISOString()).replace(/ \d{4}$/, ""); }
+  function horarioHTML() {
+    var h = horario();
+    var filas = [1, 2, 3, 4, 5, 6, 0].map(function (i) {
+      var t = h.semana[i];
+      return '<div class="h-row"><b>' + DIAS_H[i] + '</b><button type="button" class="chk h-abre' + (t ? " on" : "") + '" data-hdia="' + i + '">' + (t ? "Abre" : "No abre") + "</button>" +
+        (t ? '<input type="time" data-hini="' + i + '" value="' + t[0] + '"><span class="h-a">a</span><input type="time" data-hfin="' + i + '" value="' + aCasilla(t[1]) + '">' : "") + "</div>";
+    }).join("");
+    var esp = h.especiales.filter(function (e) { return e.fecha >= hoyTxt(); }).map(function (e) {
+      return '<div class="h-esp"><span><b>' + esc(fechaCorta(e.fecha)) + "</b> · " + (e.cerrado ? "No abrimos" : "De " + hora12(e.abre) + " a " + hora12(e.cierra)) + "</span>" +
+        '<button type="button" class="btn ghost" data-hdel="' + esc(e.fecha) + '">Quitar</button></div>';
+    }).join("") || '<p class="note">No hay días especiales.</p>';
+    var f = state.hForm || (state.hForm = { fecha: "", tipo: "cerrado", abre: "18:00", cierra: "00:00" });
+    return '<div class="card horario">' + filas +
+      '<p class="note">Se guarda al cambiar cada casilla y el menú web lo muestra (hace falta internet). 12:00 am es medianoche.</p></div>' +
+      '<div class="card horario"><h4>Días especiales</h4><p class="note">Para cuando un día no se abre, o se abre en otro horario (por ejemplo más temprano).</p>' + esp +
+      '<div class="h-form"><label class="field"><span>Fecha</span><input id="he-fecha" type="date" min="' + hoyTxt() + '" value="' + esc(f.fecha) + '"></label>' +
+      '<label class="field"><span>Ese día</span><select id="he-tipo"><option value="cerrado"' + (f.tipo === "cerrado" ? " selected" : "") + '>No abrimos</option>' +
+      '<option value="horas"' + (f.tipo === "horas" ? " selected" : "") + ">Abrimos en otro horario</option></select></label>" +
+      (f.tipo === "horas" ? '<div class="h-row"><b>De</b><input id="he-abre" type="time" value="' + esc(f.abre) + '"><span class="h-a">a</span><input id="he-cierra" type="time" value="' + esc(f.cierra) + '"></div>' : "") +
+      '<button type="button" class="btn" data-act="he-add">Agregar día especial</button></div></div>';
+  }
+  function guardarHorario(cambiar, ok) {
+    return guardarCatalogo(function (c) { c.horario = JSON.parse(JSON.stringify(c.horario || HORARIO_BASE)); cambiar(c.horario); }, ok);
+  }
+
   function settingsHTML() {
     var rows = PRODUCTS.filter(function (p) { return !p.extra; }).map(function (p) {
       if (!sellable(p) && p.disponible !== false) {
@@ -835,6 +875,7 @@
       }).join("");
     }).join("");
     return '<div class="page"><div class="page-in"><h2>Ajustes</h2>' +
+      "<h3>Horario del local</h3>" + horarioHTML() +
       "<h3>Precios y disponibilidad</h3>" +
       '<div class="card prices"><table><tr><th>Producto</th><th class="r">Precio</th><th class="r"></th></tr>' + rows + "</table>" +
       '<p class="note">Se guarda al salir de cada casilla y cambia también en el menú web (hace falta internet). La cerveza es solo de la caja: se guarda en este iPad.</p></div>' +
@@ -1070,6 +1111,19 @@
     if ((el = find(t, "[data-ptab]"))) { ped.tab = attr(el, "data-ptab"); return render(); }
     if (find(t, '[data-act="show-login"]')) return showLogin();
     if (find(t, '[data-act="logout"]')) return logout();
+    el = find(t, "[data-hdia]");
+    if (el) { var hd = Number(attr(el, "data-hdia")), abre = !horario().semana[hd]; return guardarHorario(function (h) { h.semana[hd] = abre ? ["18:00", "24:00"] : null; }, DIAS_H[hd] + (abre ? ": abre" : ": no abre")).catch(function () {}); }
+    el = find(t, "[data-hdel]");
+    if (el) { var hf = attr(el, "data-hdel"); return guardarHorario(function (h) { h.especiales = h.especiales.filter(function (e) { return e.fecha !== hf; }); }, "Día especial quitado").catch(function () {}); }
+    if (find(t, '[data-act="he-add"]')) {
+      var hfo = state.hForm || {};
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(hfo.fecha || "")) return toast("Elige la fecha");
+      if (hfo.fecha < hoyTxt()) return toast("Esa fecha ya pasó");
+      var nuevo = hfo.tipo === "horas" ? { fecha: hfo.fecha, abre: hfo.abre, cierra: deCasilla(hfo.cierra) } : { fecha: hfo.fecha, cerrado: true };
+      if (!nuevo.cerrado && (!hfo.abre || !hfo.cierra || hfo.abre === hfo.cierra)) return toast("Revisa las horas");
+      return guardarHorario(function (h) { h.especiales = h.especiales.filter(function (e) { return e.fecha !== nuevo.fecha; }).concat([nuevo]); }, "Día especial guardado")
+        .then(function () { state.hForm = null; render(); }).catch(function () {});
+    }
     if (find(t, '[data-act="tema"]')) { var tema = db.catalogo.tema === "muertos" ? "" : "muertos"; return guardarCatalogo(function (c) { c.tema = tema; }, tema ? "Tema de Día de Muertos activado" : "Tema de Día de Muertos desactivado").catch(function () {}); }
     if (find(t, '[data-act="mute"]')) { db.settings.mute = !db.settings.mute; save(); if (!db.settings.mute) beep(); return render(); }
 
@@ -1314,6 +1368,16 @@
     var pfc = state.promoForm, PRC = { "pr-sel": "sel", "pr-horas": "horas", "pr-min": "minutos", "pr-din": "din" };
     if (pfc && PRC[t.id]) { pfc[PRC[t.id]] = t.value; if (t.id === "pr-din") render(); }
     if (state.prodForm && t.id === "pf-file" && t.files && t.files[0]) achicarFoto(t.files[0]);
+    var HEF = { "he-fecha": "fecha", "he-tipo": "tipo", "he-abre": "abre", "he-cierra": "cierra" };
+    if (HEF[t.id]) { state.hForm = state.hForm || {}; state.hForm[HEF[t.id]] = t.value; if (t.id === "he-tipo") render(); return; }
+    if (t.getAttribute("data-hini") || t.getAttribute("data-hfin")) {
+      var hi = Number(t.getAttribute("data-hini") || t.getAttribute("data-hfin")), esIni = !!t.getAttribute("data-hini"), ht = horario().semana[hi];
+      if (!ht || !/^\d{2}:\d{2}$/.test(t.value)) { render(); return toast("Hora no válida"); }
+      var nt = esIni ? [t.value, ht[1]] : [ht[0], deCasilla(t.value)];
+      if (nt[0] === nt[1] || nt[0] === "24:00") { render(); return toast("Revisa las horas"); }
+      guardarHorario(function (h) { h.semana[hi] = nt; }, "Horario del " + DIAS_H[hi].toLowerCase() + " guardado").catch(function () {});
+      return;
+    }
     if (t.getAttribute("data-price") && !SOLO_CAJA[t.getAttribute("data-price")]) {
       var cp = prod(t.getAttribute("data-price")), co = Number(t.getAttribute("data-opt")), cv = Number(t.value);
       if (t.value === "" || !(cv >= 1 && cv <= 5000)) { t.value = price(cp, co); toast("Precio no válido (de 1 a 5000)"); return; }

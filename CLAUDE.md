@@ -47,7 +47,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 ## Menú: datos del negocio
 
-- Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. y WhatsApp de pedidos: 449 360 7239 (antes 777 113 8935).
+- Horario de siempre: viernes a domingo, 6:00 pm a 12:00 am. Se cambia en Caja › Ajustes › Horario del local (ver abajo). Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. y WhatsApp de pedidos: 449 360 7239 (antes 777 113 8935).
 - Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $90. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
 - Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Llevan jitomate, cebolla, catsup, mostaza y chiles (todo se puede quitar). Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50, con queso de nachos, catsup y Valentina (se pueden quitar).
 - Alitas, orden de 10 a $110 o media orden de 5 a $60. Sabores: receta secreta sin salsa, piña habanero, mango habanero, tamarindo picante, BBQ picante y BBQ dulce. El cliente reparte las alitas por sabor con un contador (− / +) hasta completar 10 o 5 (4 en el CARBONCITO) y no puede agregarlas hasta que todas tengan sabor. El pedido manda `sabores: { sabor: cuántas }` (en combos, por parte) y el servidor exige que sumen exacto; responde `["6 × BBQ dulce", "4 × Mango habanero"]` o el nombre solo si son de un sabor. Pedidos de un menú viejo con `sauces` (mitad y mitad) se reparten a la mitad. Llevan ranch (se puede quitar). Las verduras no siempre van: no se anuncian ni aparecen para quitar.
@@ -90,6 +90,13 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Productos nuevos (ids `x-…`): nombre, descripción, precio, categoría, foto y disponibilidad desde Caja > Ajustes. No se borran: se desactivan (si la caja los omite, el servidor los conserva desactivados). La foto se achica en el iPad (canvas, 800 px) y se sube a `POST /api/catalogo/img`; el servidor revisa que sea PNG o JPEG de verdad (bytes del encabezado), ≤ 400 KB y ≤ 1600 px, y la sirve en `/api/img/<id>` con `nosniff`. En el menú se dibujan con el constructor de bebidas (su foto, o su nombre si no tiene).
 - La cerveza (solo caja) guarda su precio y agotado en el iPad (`SOLO_CAJA`).
 - Tema de temporada: `tema` en `catalogo/ajustes` (`"muertos"` o vacío). Se prende y apaga en Caja > Ajustes > Tema del menú web; una caja vieja que no manda `tema` no lo cambia. El menú pone la clase `theme-muertos` en `<html>` antes de pintar (script en el `<head>` con la copia `carbon-catalogo`) y la corrige al llegar el catálogo. El diseño (de Codex) está en `public/spooky.css` y `public/spooky-*.svg`, más los bloques `muertos-*` del HTML; sin la clase quedan ocultos. La caja no cambia de aspecto.
+
+## Horario del local
+
+- `horario` en `catalogo/ajustes`: `semana[0..6]` (0 = domingo) con `[abre, cierra]` o `null`, y `especiales: [{ fecha, cerrado }]` o `[{ fecha, abre, cierra }]` para cuando no se abre o se abre en otro horario. "24:00" es medianoche; si cierra antes de abrir, cierra al día siguiente. Por defecto `HORARIO_BASE` (viernes a domingo, 18:00 a 24:00), igual en servidor, menú y caja.
+- El servidor revisa horas y fechas, borra los días especiales que ya pasaron y no borra el horario si una caja vieja no lo manda.
+- Caja › Ajustes › Horario del local (primera sección): botón Abre / No abre y horas por día; días especiales con fecha. Se guarda al cambiar cada casilla. En las casillas de hora la medianoche se ve como 12:00 am.
+- El menú pinta con la hora de Temixco (`ahoraMx`) la pastilla (Abierto ahora / Hoy abrimos a las… / Abrimos el…), el resumen de la semana y avisos de los días especiales de los próximos 7 días; se revisa cada minuto. No bloquea pedidos fuera de horario.
 
 ## Estados del pedido, seguimiento y avisos
 

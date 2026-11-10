@@ -177,6 +177,7 @@ body { position: relative; }
 .status i { width: 9px; height: 9px; border-radius: 50%; background: #a89383; }
 .status.open { color: var(--ok); background: rgba(95, 211, 137, .12); }
 .status.open i { background: var(--ok); animation: pulse 1.8s infinite; }
+.horario-aviso { margin: 4px auto 0; padding: 6px 12px; border-radius: 10px; background: rgba(255, 196, 92, .16); color: #ffd79a; font-weight: 700; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(95, 211, 137, .6); } 100% { box-shadow: 0 0 0 9px rgba(95, 211, 137, 0); } }
 .info p { margin: 0; color: rgba(248, 236, 215, .78); }
 .info strong { color: var(--cream); font-weight: 600; }
@@ -708,7 +709,8 @@ body.has-cart .mi-pedido { bottom: calc(84px + env(safe-area-inset-bottom, 0px))
 
   <div class="info">
     <span class="status" id="status"><i></i><span id="status-text">Viernes a domingo</span></span>
-    <p>Abierto de <strong>viernes a domingo</strong>, de <strong>6:00 pm a 12:00 am</strong>.</p>
+    <p id="horario-txt">Abierto <strong>viernes a domingo</strong>, de <strong>6:00 pm a 12:00 am</strong>.</p>
+    <p class="horario-aviso" id="horario-aviso" hidden></p>
     <p>Pedidos al <strong class="phone" id="phone">449 360 7239</strong></p>
     <div class="actions">
       <a class="btn wa" href="https://wa.me/524493607239?text=Hola%2C%20quiero%20hacer%20un%20pedido" target="_blank" rel="noopener">
@@ -1011,6 +1013,70 @@ const slotHTML = () => `<div class="item slot" aria-disabled="true">
    Los precios, lo agotado y los productos nuevos se cambian en Caja > Ajustes y el servidor cobra con ellos.
    Aquí se guardan los precios de fábrica para regresar a ellos si la caja quita un cambio. */
 ALL.forEach(p => { p._precios = p.prices.map(r => r[1]); p._disp = p.disponible; });
+/* ---------- horario del local ----------
+   Lo cambia la caja (Ajustes › Horario del local) y llega con el catálogo; aquí está el de siempre por si no hay copia.
+   semana[0..6] (0 = domingo) con [abre, cierra] o null; especiales por fecha: no abrimos, u otro horario.
+   "24:00" es medianoche; si cierra antes de abrir, cierra al día siguiente. Todo con la hora de Temixco. */
+let HORARIO = { semana: [["18:00", "24:00"], null, null, null, null, ["18:00", "24:00"], ["18:00", "24:00"]], especiales: [] };
+const DIAS_N = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const minDe = s => Number(s.slice(0, 2)) * 60 + Number(s.slice(3));
+const hora12 = (s, corto) => { const h = Number(s.slice(0, 2)) % 24, m = s.slice(3); return (h % 12 || 12) + (corto && m === "00" ? "" : ":" + m) + " " + (h >= 12 ? "pm" : "am"); };
+function ahoraMx(dias = 0) {
+  const t = new Date(Date.now() + dias * 864e5);
+  try {
+    const p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(t).forEach(x => { p[x.type] = x.value; });
+    return { fecha: `${p.year}-${p.month}-${p.day}`, dia: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday), min: (Number(p.hour) % 24) * 60 + Number(p.minute) };
+  } catch (e) {
+    return { fecha: `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`, dia: t.getDay(), min: t.getHours() * 60 + t.getMinutes() };
+  }
+}
+const tramoDel = d => { const e = HORARIO.especiales.find(x => x.fecha === d.fecha); return e ? (e.cerrado ? null : [e.abre, e.cierra]) : HORARIO.semana[d.dia]; };
+const cierraMin = t => { const a = minDe(t[0]), c = minDe(t[1]); return c > a ? c : c + 1440; };
+/* "viernes a domingo, de 6:00 pm a 12:00 am" (junta los días seguidos con el mismo horario, de lunes a domingo) */
+function resumenSemana() {
+  const orden = [1, 2, 3, 4, 5, 6, 0], grupos = [];
+  orden.forEach((d, k) => {
+    const t = HORARIO.semana[d]; if (!t) return;
+    const g = grupos[grupos.length - 1];
+    if (g && g.k === k - 1 && g.t[0] === t[0] && g.t[1] === t[1]) { g.dias.push(d); g.k = k; } else grupos.push({ t, dias: [d], k });
+  });
+  if (!grupos.length) return "Por ahora no tenemos días fijos: revisa los avisos.";
+  const nombre = d => d.length === 1 ? DIAS_N[d[0]] : d.length === 2 ? `${DIAS_N[d[0]]} y ${DIAS_N[d[1]]}` : `${DIAS_N[d[0]]} a ${DIAS_N[d[d.length - 1]]}`;
+  return "Abierto " + grupos.map(g => `<strong>${nombre(g.dias)}</strong>, de <strong>${hora12(g.t[0])} a ${hora12(g.t[1])}</strong>`).join("; ") + ".";
+}
+function pintarHorario() {
+  const el = document.getElementById("status"), t = document.getElementById("status-text"), aviso = document.getElementById("horario-aviso");
+  if (!el) return;
+  try {
+    const hoy = ahoraMx(), th = tramoDel(hoy), ta = tramoDel(ahoraMx(-1));
+    let hasta = "";
+    if (ta && cierraMin(ta) > 1440 && hoy.min < cierraMin(ta) - 1440) hasta = ta[1];   /* lo de anoche que cierra después de medianoche */
+    if (th && hoy.min >= minDe(th[0]) && hoy.min < cierraMin(th)) hasta = th[1];
+    el.classList.toggle("open", !!hasta);
+    if (hasta) t.textContent = hasta === "24:00" ? "Abierto ahora" : `Abierto hasta las ${hora12(hasta, true)}`;
+    else if (th && hoy.min < minDe(th[0])) t.textContent = `Hoy abrimos a las ${hora12(th[0], true)}`;
+    else {
+      t.textContent = "Hoy no abrimos";
+      for (let i = 1; i <= 21; i++) {
+        const d = ahoraMx(i), x = tramoDel(d);
+        if (x) { t.textContent = i === 1 ? `Abrimos mañana a las ${hora12(x[0], true)}` : `Abrimos el ${DIAS_N[d.dia]}${i > 6 ? " " + Number(d.fecha.slice(8)) : ""} a las ${hora12(x[0], true)}`; break; }
+      }
+    }
+    document.getElementById("horario-txt").innerHTML = resumenSemana();
+    /* avisos de los próximos 7 días: cuándo no se abre o se abre en otro horario */
+    const manana = ahoraMx(1).fecha, tope = ahoraMx(7).fecha;
+    const avisos = HORARIO.especiales.filter(e => e.fecha >= hoy.fecha && e.fecha <= tope).map(e => {
+      const [y, m, dd] = e.fecha.split("-").map(Number), dia = new Date(Date.UTC(y, m - 1, dd)).getUTCDay();
+      const cuando = e.fecha === hoy.fecha ? "Hoy" : e.fecha === manana ? "Mañana" : `El ${DIAS_N[dia]} ${dd}`;
+      return e.cerrado ? `${cuando} no abrimos.` : `${cuando} abrimos de ${hora12(e.abre)} a ${hora12(e.cierra)}.`;
+    });
+    aviso.hidden = !avisos.length;
+    aviso.innerHTML = avisos.map(esc).join("<br>");
+  } catch (e) { /* un horario raro no rompe el menú: se queda el texto de antes */ }
+}
+
 const CAT_KEY = "carbon-catalogo";
 let catalogoV = -1;
 function aplicarCatalogo(c) {
@@ -1028,6 +1094,7 @@ function aplicarCatalogo(c) {
       file: /^\/api\/img\/[a-z0-9-]+$/.test(x.img || "") ? x.img : null, prices: [["", Number(x.price)]], recipe: [], fixed: [], extra: true, disponible: true });
   });
   ALL = Object.values(MENU).flat().concat(PROMOS);
+  if (c.horario && Array.isArray(c.horario.semana) && Array.isArray(c.horario.especiales)) { HORARIO = c.horario; pintarHorario(); }
   const muertos = c.tema === "muertos";
   document.documentElement.classList.toggle("theme-muertos", muertos);
   document.querySelector('meta[name="theme-color"]').content = muertos ? "#392044" : "#2b1a10";
@@ -2335,19 +2402,9 @@ const io = new IntersectionObserver(ents => ents.forEach(en => {
 }), { rootMargin: "-40% 0px -55% 0px" });
 document.querySelectorAll("section").forEach(s => io.observe(s));
 
-/* abierto ahora (hora del centro de México) */
-(function () {
-  let d;
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Mexico_City", weekday: "short", hour: "numeric", hour12: false }).formatToParts(new Date());
-    d = { day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.find(p => p.type === "weekday").value), h: Number(parts.find(p => p.type === "hour").value) % 24 };
-  } catch (e) { const n = new Date(); d = { day: n.getDay(), h: n.getHours() }; }
-  const openDay = d.day === 5 || d.day === 6 || d.day === 0;
-  const el = document.getElementById("status"), t = document.getElementById("status-text");
-  if (openDay && d.h >= 18) { el.classList.add("open"); t.textContent = "Abierto ahora"; }
-  else if (openDay) t.textContent = "Hoy abrimos a las 6 pm";
-  else t.textContent = d.day === 4 ? "Abrimos mañana a las 6 pm" : "Abrimos el viernes a las 6 pm";
-})();
+/* abierto ahora (hora de Temixco), según el horario de la caja; se revisa cada minuto */
+pintarHorario();
+setInterval(pintarHorario, 60000);
 
 /* copiar número */
 document.getElementById("copy").addEventListener("click", () => {

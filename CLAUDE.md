@@ -4,7 +4,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 ## Qué hay en el repositorio
 
-- `public/index.html`: menú web para clientes (celulares modernos). Constructor visual por capas con fotos WebP en `public/img/`, carrito, envío del pedido a `/api/pedidos` y sala de seguimiento del pedido. Si el envío falla (y el servidor confirma que no se guardó), ofrece WhatsApp (527771138935).
+- `public/index.html`: menú web para clientes (celulares modernos). Constructor visual por capas con fotos WebP en `public/img/`, carrito, envío del pedido a `/api/pedidos` y sala de seguimiento del pedido. Si el envío falla (y el servidor confirma que no se guardó), ofrece WhatsApp (524493607239).
 - `public/sw-menu.js` + `public/manifest-menu.webmanifest`: service worker del menú solo para avisos push (no guarda nada en caché) y manifiesto para agregarlo a Inicio (sin `start_url`: abre la página donde se agregó, con su pedido).
 - `public/caja/`: punto de venta para el iPad Air 1 con iOS 12.5.8 (no se puede actualizar). Vender, cobrar con cambio, ventas del turno, corte de caja, Ajustes (precios, agotados y productos nuevos, guardados en el servidor), y pestaña Pedidos que recibe los pedidos del menú (consulta cada 10 s con la sesión de la caja). Se entra con usuario y contraseña.
 - `netlify/functions/pedidos.mjs` + `shared/core.mjs`: API sobre Netlify Blobs (pedidos, catálogo compartido, seguimiento del cliente, avisos push). El servidor recalcula precios con el catálogo vigente; el precio que manda el cliente no se usa.
@@ -29,6 +29,15 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - En pruebas, el menú y la caja muestran una franja roja "SITIO/CAJA DE PRUEBAS". Se activa en cualquier dirección con `--` (branch deploys y vistas previas) y en `localhost`.
 - `CAJA_USUARIO`, `CAJA_PASSWORD`, `VAPID_PUBLIC` y `VAPID_PRIVATE` pueden (y en VAPID deben) tener otro valor en pruebas: en Netlify, *Environment variables → la variable → Different value for each deploy context*. Cambiar `CAJA_PASSWORD` cierra todas las sesiones de la caja (necesita redeploy).
 
+## Mudanza a Cloudflare (en curso)
+
+- Cuenta nueva de Cloudflare, solo del negocio. Worker `elcarboncito` (Workers con archivos estáticos) conectado a GitHub: `main` publica producción con `npx wrangler deploy`; `pruebas` es su vista previa (`npx wrangler preview`) en `pruebas-elcarboncito.<subdominio>.workers.dev`, pública (sin inicio de sesión).
+- `wrangler.jsonc`: `public/` se sirve sola; solo `/api/*` pasa por `cloudflare/worker.mjs`, que llama al mismo `handle()` de `shared/core.mjs`. Wrangler fijo en `package.json` (las vistas previas piden 4.135.0 o más).
+- Datos en D1 (`shared/almacen-d1.mjs`): una tabla `datos(k, v)` que se crea sola, con las mismas operaciones que Blobs. Base `carboncito` para producción y `carboncito-pruebas` en el bloque `previews`: nunca se mezclan. KV no sirve: su plan gratis permite 1,000 escrituras y 1,000 listados al día y la caja consulta cada 10 s.
+- Cabeceras de seguridad en `public/_headers` (iguales a `netlify.toml`). La franja de pruebas también sale en direcciones que empiezan con `pruebas-`.
+- Probar en local como Cloudflare: `node dev/cloudflare.mjs` (puerto 8789, D1 sobre el SQLite de Node, `dev/d1-local.mjs`) y `ALMACEN=d1 node dev/pruebas.mjs`.
+- Netlify sigue siendo producción hasta el cambio. Al cambiar: respaldo de la caja del iPad (Copiar respaldo → Restaurar respaldo en la dirección nueva, porque las ventas viven en el navegador por dirección) y dejar Netlify redirigiendo a la dirección nueva por los QR impresos.
+
 ## Pagos, ticket y datos del cliente
 
 - Transferencias SPEI a la CLABE **1275 4001 3091 452136** (constante `CLABE` en el menú). Se muestra con botón Copiar en "Tu pedido" y en la pantalla de pedido enviado, con el botón "Mandar captura por WhatsApp" que lleva el folio. La caja recuerda revisar en el banco que llegó antes de preparar.
@@ -38,7 +47,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 ## Menú: datos del negocio
 
-- Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. 777 113 8935.
+- Horario de siempre: viernes a domingo, 6:00 pm a 12:00 am. Se cambia en Caja › Ajustes › Horario del local (ver abajo). Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. y WhatsApp de pedidos: 449 360 7239 (antes 777 113 8935).
 - Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $90. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
 - Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Llevan jitomate, cebolla, catsup, mostaza y chiles (todo se puede quitar). Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50, con queso de nachos, catsup y Valentina (se pueden quitar).
 - Alitas, orden de 10 a $110 o media orden de 5 a $60. Sabores: receta secreta sin salsa, piña habanero, mango habanero, tamarindo picante, BBQ picante y BBQ dulce. El cliente reparte las alitas por sabor con un contador (− / +) hasta completar 10 o 5 (4 en el CARBONCITO) y no puede agregarlas hasta que todas tengan sabor. El pedido manda `sabores: { sabor: cuántas }` (en combos, por parte) y el servidor exige que sumen exacto; responde `["6 × BBQ dulce", "4 × Mango habanero"]` o el nombre solo si son de un sabor. Pedidos de un menú viejo con `sauces` (mitad y mitad) se reparten a la mitad. Llevan ranch (se puede quitar). Las verduras no siempre van: no se anuncian ni aparecen para quitar.
@@ -81,6 +90,13 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - Productos nuevos (ids `x-…`): nombre, descripción, precio, categoría, foto y disponibilidad desde Caja > Ajustes. No se borran: se desactivan (si la caja los omite, el servidor los conserva desactivados). La foto se achica en el iPad (canvas, 800 px) y se sube a `POST /api/catalogo/img`; el servidor revisa que sea PNG o JPEG de verdad (bytes del encabezado), ≤ 400 KB y ≤ 1600 px, y la sirve en `/api/img/<id>` con `nosniff`. En el menú se dibujan con el constructor de bebidas (su foto, o su nombre si no tiene).
 - La cerveza (solo caja) guarda su precio y agotado en el iPad (`SOLO_CAJA`).
 - Tema de temporada: `tema` en `catalogo/ajustes` (`"muertos"` o vacío). Se prende y apaga en Caja > Ajustes > Tema del menú web; una caja vieja que no manda `tema` no lo cambia. El menú pone la clase `theme-muertos` en `<html>` antes de pintar (script en el `<head>` con la copia `carbon-catalogo`) y la corrige al llegar el catálogo. El diseño (de Codex) está en `public/spooky.css` y `public/spooky-*.svg`, más los bloques `muertos-*` del HTML; sin la clase quedan ocultos. La caja no cambia de aspecto.
+
+## Horario del local
+
+- `horario` en `catalogo/ajustes`: `semana[0..6]` (0 = domingo) con `[abre, cierra]` o `null`, y `especiales: [{ fecha, cerrado }]` o `[{ fecha, abre, cierra }]` para cuando no se abre o se abre en otro horario. "24:00" es medianoche; si cierra antes de abrir, cierra al día siguiente. Por defecto `HORARIO_BASE` (viernes a domingo, 18:00 a 24:00), igual en servidor, menú y caja.
+- El servidor revisa horas y fechas, borra los días especiales que ya pasaron y no borra el horario si una caja vieja no lo manda.
+- Caja › Ajustes › Horario del local (primera sección): botón Abre / No abre y horas por día; días especiales con fecha. Se guarda al cambiar cada casilla. En las casillas de hora la medianoche se ve como 12:00 am.
+- El menú pinta con la hora de Temixco (`ahoraMx`) la pastilla (Abierto ahora / Hoy abrimos a las… / Abrimos el…), el resumen de la semana y avisos de los días especiales de los próximos 7 días; se revisa cada minuto. No bloquea pedidos fuera de horario.
 
 ## Estados del pedido, seguimiento y avisos
 

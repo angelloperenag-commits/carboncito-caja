@@ -330,8 +330,37 @@ export function catalogoCon(aj) {
   });
   return cat;
 }
+/* Horario del local: semana[0..6] (0 = domingo) con [abre, cierra] o null si no abre, y días especiales por fecha
+   (cerrado, u otro horario) para cuando no se abre o se abre más temprano. "24:00" es medianoche; si cierra antes de abrir, cierra al día siguiente.
+   Las fechas y horas son de Temixco (centro de México). */
+export const HORARIO_BASE = { semana: [["18:00", "24:00"], null, null, null, null, ["18:00", "24:00"], ["18:00", "24:00"]], especiales: [] };
+const HORA = /^(([01]\d|2[0-3]):[0-5]\d|24:00)$/, FECHA = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+export const fechaMx = (t) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
+function limpiarHorario(h, now) {
+  if (!h || typeof h !== "object") throw new Error("El horario no es válido.");
+  const tramo = (a, b) => typeof a === "string" && typeof b === "string" && HORA.test(a) && HORA.test(b) && a !== "24:00" && a !== b ? [a, b] : null;
+  const semana = DIAS_SEMANA.map((nombre, i) => {
+    const d = Array.isArray(h.semana) ? h.semana[i] : null;
+    if (!d) return null;
+    const t = Array.isArray(d) && tramo(d[0], d[1]);
+    if (!t) throw new Error(`Revisa las horas del ${nombre}.`);
+    return t;
+  });
+  /* los días especiales que ya pasaron se borran solos (se guarda desde ayer, por si se cierra después de medianoche) */
+  const desde = fechaMx(now - 864e5), vistos = new Set();
+  const especiales = (Array.isArray(h.especiales) ? h.especiales : []).slice(0, 60).map((e) => {
+    const fecha = e && typeof e.fecha === "string" && FECHA.test(e.fecha) ? e.fecha : "";
+    if (!fecha) throw new Error("Hay un día especial sin fecha válida.");
+    if (e.cerrado) return { fecha, cerrado: true };
+    const t = tramo(e.abre, e.cierra);
+    if (!t) throw new Error(`Revisa las horas del día especial ${fecha}.`);
+    return { fecha, abre: t[0], cierra: t[1] };
+  }).filter((e) => e.fecha >= desde && !vistos.has(e.fecha) && vistos.add(e.fecha)).sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
+  return { semana, especiales };
+}
 /* revisa lo que manda la caja antes de guardarlo */
-function limpiarAjustes(b, prev) {
+function limpiarAjustes(b, prev, now = Date.now()) {
   const precios = {}, agotado = {};
   for (const [id, arr] of Object.entries(b.precios || {})) {
     if (!own(CATALOG, id) || !Array.isArray(arr)) continue;
@@ -353,9 +382,11 @@ function limpiarAjustes(b, prev) {
   (prev.extra || []).forEach((x) => { if (!ids.has(x.id)) extra.push(Object.assign({}, x, { disponible: false })); });
   /* tema de temporada del menú; una caja vieja que no lo manda no lo apaga */
   const tema = own(b, "tema") ? (b.tema === "muertos" ? "muertos" : "") : prev.tema || "";
-  return { precios, agotado, extra, tema };
+  /* horario: igual que el tema, una caja vieja que no lo manda no lo borra */
+  const horario = own(b, "horario") ? limpiarHorario(b.horario, now) : prev.horario || null;
+  return { precios, agotado, extra, tema, horario };
 }
-const ajustesPublicos = (aj) => ({ v: aj.v || 0, precios: aj.precios || {}, agotado: aj.agotado || {}, extra: aj.extra || [], tema: aj.tema || "" });
+const ajustesPublicos = (aj) => ({ v: aj.v || 0, precios: aj.precios || {}, agotado: aj.agotado || {}, extra: aj.extra || [], tema: aj.tema || "", horario: aj.horario || HORARIO_BASE });
 
 /* fotos de productos nuevos: JPEG o PNG, hasta 400 KB y 1600 px por lado (la caja las achica antes de subirlas) */
 function medidasImagen(b) {
@@ -656,7 +687,7 @@ export async function handle(req, store, cfg, ip = "") {
     }
 
     /* ---- caja ---- */
-    if (!cfg.password) return json({ error: "Falta configurar CAJA_PASSWORD en Netlify." }, 500);
+    if (!cfg.password) return json({ error: "Falta poner la contraseña de la caja (CAJA_PASSWORD) en el servidor." }, 500);
     const intentos = ip ? await claveIP(ip, "intentos/") : "";
     if (req.method === "POST" && ruta === "/api/caja/login") {
       const espera = await bloqueado(store, intentos);

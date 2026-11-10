@@ -1,0 +1,15 @@
+# Cabeceras de seguridad en Cloudflare (las mismas de netlify.toml): solo se ejecuta código del propio sitio
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000
+
+# La caja y el menú siempre en su versión más nueva
+/caja/sw.js
+  Cache-Control: no-cache
+
+/sw-menu.js
+  Cache-Control: no-cache

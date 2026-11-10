@@ -29,6 +29,15 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 - En pruebas, el menú y la caja muestran una franja roja "SITIO/CAJA DE PRUEBAS". Se activa en cualquier dirección con `--` (branch deploys y vistas previas) y en `localhost`.
 - `CAJA_USUARIO`, `CAJA_PASSWORD`, `VAPID_PUBLIC` y `VAPID_PRIVATE` pueden (y en VAPID deben) tener otro valor en pruebas: en Netlify, *Environment variables → la variable → Different value for each deploy context*. Cambiar `CAJA_PASSWORD` cierra todas las sesiones de la caja (necesita redeploy).
 
+## Mudanza a Cloudflare (en curso)
+
+- Cuenta nueva de Cloudflare, solo del negocio. Worker `elcarboncito` (Workers con archivos estáticos) conectado a GitHub: `main` publica producción con `npx wrangler deploy`; `pruebas` es su vista previa (`npx wrangler preview`) en `pruebas-elcarboncito.<subdominio>.workers.dev`, pública (sin inicio de sesión).
+- `wrangler.jsonc`: `public/` se sirve sola; solo `/api/*` pasa por `cloudflare/worker.mjs`, que llama al mismo `handle()` de `shared/core.mjs`. Wrangler fijo en `package.json` (las vistas previas piden 4.135.0 o más).
+- Datos en D1 (`shared/almacen-d1.mjs`): una tabla `datos(k, v)` que se crea sola, con las mismas operaciones que Blobs. Base `carboncito` para producción y `carboncito-pruebas` en el bloque `previews`: nunca se mezclan. KV no sirve: su plan gratis permite 1,000 escrituras y 1,000 listados al día y la caja consulta cada 10 s.
+- Cabeceras de seguridad en `public/_headers` (iguales a `netlify.toml`). La franja de pruebas también sale en direcciones que empiezan con `pruebas-`.
+- Probar en local como Cloudflare: `node dev/cloudflare.mjs` (puerto 8789, D1 sobre el SQLite de Node, `dev/d1-local.mjs`) y `ALMACEN=d1 node dev/pruebas.mjs`.
+- Netlify sigue siendo producción hasta el cambio. Al cambiar: respaldo de la caja del iPad (Copiar respaldo → Restaurar respaldo en la dirección nueva, porque las ventas viven en el navegador por dirección) y dejar Netlify redirigiendo a la dirección nueva por los QR impresos.
+
 ## Pagos, ticket y datos del cliente
 
 - Transferencias SPEI a la CLABE **1275 4001 3091 452136** (constante `CLABE` en el menú). Se muestra con botón Copiar en "Tu pedido" y en la pantalla de pedido enviado, con el botón "Mandar captura por WhatsApp" que lleva el folio. La caja recuerda revisar en el banco que llegó antes de preparar.

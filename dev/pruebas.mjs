@@ -1,9 +1,12 @@
 /* Pruebas del servidor (shared/core.mjs) con un almacén en memoria: node dev/pruebas.mjs
+   Con el almacén de Cloudflare (D1 sobre SQLite local): ALMACEN=d1 node dev/pruebas.mjs
    Cubre catálogo compartido, cambio de precio, Alicombo, seguimiento privado, avisos push y ubicación. */
 import { handle, notificar, CATALOG } from "../shared/core.mjs";
+import { almacenD1 } from "../shared/almacen-d1.mjs";
+import { d1Local } from "./d1-local.mjs";
 
 const mem = new Map();
-const store = {
+const store = process.env.ALMACEN === "d1" ? almacenD1(d1Local()) : {
   async list({ prefix }) { return { blobs: [...mem.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })) }; },
   async get(k) { return mem.has(k) ? JSON.parse(mem.get(k)) : null; },
   async setJSON(k, v) { mem.set(k, JSON.stringify(v)); },
@@ -87,7 +90,7 @@ prueba("foto de 5000 px se rechaza", (await api("POST", "/api/catalogo/img", { i
 console.log("Seguimiento privado (dos clientes en la misma IP)");
 const ipCompartida = "200.1.1.1";
 const a = await api("POST", "/api/pedidos", pedidoSencilla({ cliente: cliente({ name: "Cliente A" }) }), {}, ipCompartida);
-mem.forEach((v, k) => { if (k.startsWith("limite/")) mem.delete(k); });   /* sin la espera de un minuto entre A y B */
+for (const b of (await store.list({ prefix: "limite/" })).blobs) await store.delete(b.key);   /* sin la espera de un minuto entre A y B */
 const b = await api("POST", "/api/pedidos", pedidoSencilla({ cliente: cliente({ name: "Cliente B" }) }), {}, ipCompartida);
 prueba("cada cliente recibe su cookie HttpOnly distinta", a.cookie && b.cookie && a.cookie !== b.cookie);
 const verA = await api("GET", "/api/seguimiento?p=" + encodeURIComponent(a.d.pedido), null, { cookie: a.cookie }, ipCompartida);

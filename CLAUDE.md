@@ -4,7 +4,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 ## Qué hay en el repositorio
 
-- `public/index.html`: menú web para clientes (celulares modernos). Constructor visual por capas con fotos WebP en `public/img/`, carrito, envío del pedido a `/api/pedidos` y sala de seguimiento del pedido. Si el envío falla (y el servidor confirma que no se guardó), ofrece WhatsApp (527771138935).
+- `public/index.html`: menú web para clientes (celulares modernos). Constructor visual por capas con fotos WebP en `public/img/`, carrito, envío del pedido a `/api/pedidos` y sala de seguimiento del pedido. Si el envío falla (y el servidor confirma que no se guardó), ofrece WhatsApp (524493607239).
 - `public/sw-menu.js` + `public/manifest-menu.webmanifest`: service worker del menú solo para avisos push (no guarda nada en caché) y manifiesto para agregarlo a Inicio (sin `start_url`: abre la página donde se agregó, con su pedido).
 - `public/caja/`: punto de venta para el iPad Air 1 con iOS 12.5.8 (no se puede actualizar). Vender, cobrar con cambio, ventas del turno, corte de caja, Ajustes (precios, agotados y productos nuevos, guardados en el servidor), y pestaña Pedidos que recibe los pedidos del menú (consulta cada 10 s con la sesión de la caja). Se entra con usuario y contraseña.
 - `netlify/functions/pedidos.mjs` + `shared/core.mjs`: API sobre Netlify Blobs (pedidos, catálogo compartido, seguimiento del cliente, avisos push). El servidor recalcula precios con el catálogo vigente; el precio que manda el cliente no se usa.
@@ -38,7 +38,7 @@ Proyecto del negocio familiar El Carboncito (hamburguesas, hotdogs, salchipulpos
 
 ## Menú: datos del negocio
 
-- Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. 777 113 8935.
+- Abierto viernes a domingo, 6:00 pm a 12:00 am. Jerusalén 8, Lázaro Cárdenas del Río, 62588 Temixco, Morelos. Tel. y WhatsApp de pedidos: 449 360 7239 (antes 777 113 8935).
 - Hamburguesas en combo con papas (sin papas $10 menos): Sencilla $60, Hawaiana $70, BBQ $70, Loba $80, Monstruo $90. Todas llevan lechuga, jitomate, cebolla, chile en vinagre, catsup y mostaza; solo se pueden quitar ingredientes, no hay extras con costo.
 - Hotdog sencillo $20 o 3 por $40; con tocino $25 o 3 por $50. Llevan jitomate, cebolla, catsup, mostaza y chiles (todo se puede quitar). Salchipulpos chico $40 (4 mitades) o grande $60 (6 mitades). Papas chica $30 o grande $50, con queso de nachos, catsup y Valentina (se pueden quitar).
 - Alitas, orden de 10 a $110 o media orden de 5 a $60. Sabores: receta secreta sin salsa, piña habanero, mango habanero, tamarindo picante, BBQ picante y BBQ dulce. El cliente reparte las alitas por sabor con un contador (− / +) hasta completar 10 o 5 (4 en el CARBONCITO) y no puede agregarlas hasta que todas tengan sabor. El pedido manda `sabores: { sabor: cuántas }` (en combos, por parte) y el servidor exige que sumen exacto; responde `["6 × BBQ dulce", "4 × Mango habanero"]` o el nombre solo si son de un sabor. Pedidos de un menú viejo con `sauces` (mitad y mitad) se reparten a la mitad. Llevan ranch (se puede quitar). Las verduras no siempre van: no se anuncian ni aparecen para quitar.

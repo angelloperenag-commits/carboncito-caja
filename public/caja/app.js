@@ -497,15 +497,15 @@
       '<button type="button" data-act="maps">Buscar en Maps</button></div>' : "";
     var ranch = hayAlitas() ? '<div class="seg ranch"><span>Alitas</span><button type="button" data-ranch="1" class="' + (state.ranch ? "on" : "") + '">Con ranch</button>' +
       '<button type="button" data-ranch="0" class="' + (state.ranch ? "" : "on") + '">Sin ranch</button></div>' : "";
-    /* arriba: vaciar (rojo, con bote de basura) y por cobrar (verde), lejos del botón de cobrar */
+    /* arriba solo vaciar (rojo, con bote de basura), lejos de cobrar; por cobrar (verde) va abajo junto a cobrar */
     return '<div class="t-head"><button type="button" class="back-cat" data-act="hide-ticket">‹ Productos</button>' +
       '<div class="t-title"><h2>Ticket</h2><span class="folio">' + (state.fromPend ? "Cuenta por cobrar" : "Venta #" + db.shift.next) + "</span></div>" +
-      '<button type="button" class="t-btn trash" data-act="clear" aria-label="Vaciar ticket"' + dis + ">" + TRASH + "Vaciar</button>" +
-      '<button type="button" class="t-btn hold" data-act="hold"' + dis + ">Por cobrar</button></div>" +
+      '<button type="button" class="t-btn trash" data-act="clear" aria-label="Vaciar ticket"' + dis + ">" + TRASH + "Vaciar</button></div>" +
       '<div class="lines">' + lines + "</div>" +
       '<div class="t-meta">' + ranch + '<div class="seg">' + tipos + "</div>" + dir + '<input id="nota" type="text" placeholder="Nombre del cliente o mesa" value="' + esc(state.nota) + '" autocomplete="off"></div>' +
       '<div class="t-foot"><div class="total"><span>Total</span><b>' + money(t) + "</b></div>" +
-      '<button type="button" class="btn pay-btn" data-act="pay"' + dis + ">Cobrar " + money(t) + "</button></div>";
+      '<div class="t-pay"><button type="button" class="btn green hold-btn" data-act="hold"' + dis + ">Por cobrar</button>" +
+      '<button type="button" class="btn pay-btn" data-act="pay"' + dis + ">Cobrar " + money(t) + "</button></div></div>";
   }
 
   function liveSales() { return db.shift.sales.filter(function (s) { return !s.cancelada; }); }

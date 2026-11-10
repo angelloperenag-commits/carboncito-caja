@@ -118,9 +118,10 @@ html { touch-action: pan-x pan-y; }
 .t-btn { flex: none; display: flex; align-items: center; border: 0; border-radius: 10px; padding: 9px 11px; margin-left: 6px; font-weight: 700; font-size: 14px; color: #fff; }
 .t-btn svg { margin-right: 4px; }
 .t-btn.trash { background: var(--err); }
-.t-btn.hold { background: #1f9d55; }
 .t-btn[disabled] { opacity: .35; }
-.pay-btn { width: 100%; }
+.t-pay { display: flex; }
+.t-pay .hold-btn { flex: 0 0 36%; margin-right: 8px; }
+.t-pay .pay-btn { flex: 1 1 auto; min-width: 0; }
 .seg.ranch { margin-bottom: 8px; align-items: center; }
 .seg.ranch span { flex: none; padding: 0 8px 0 6px; font-size: 13px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; }
 .cats button.pend { background: #e7f6ec; border-color: #1f9d55; color: #146c3a; }

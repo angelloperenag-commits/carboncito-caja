@@ -234,7 +234,8 @@
     view: "sell", cat: "burgers", showTicket: false,
     cart: [], tipo: "aqui", nota: "", dir: "", fromPend: null, ranch: true,
     openSale: null, confirm: null,
-    pick: null, pay: null, pend: false, pendAsk: null, qr: null
+    pick: null, pay: null, pend: false, pendAsk: null, qr: null,
+    precios: {}, guardandoPrecios: false, preciosOk: ""
   };
 
   /* =========================================================
@@ -862,6 +863,47 @@
     return guardarCatalogo(function (c) { c.horario = JSON.parse(JSON.stringify(c.horario || HORARIO_BASE)); cambiar(c.horario); }, ok);
   }
 
+  /* =========================================================
+     PRECIOS: se escriben en las casillas (borrador en state.precios) y se guardan todos juntos con el botón Guardar.
+     Así un cambio no pisa a otro y se ve claro cuándo quedó guardado.
+     ========================================================= */
+  function precioBorrador(p, i) { var b = state.precios[p.id]; return b && b[i] !== undefined ? b[i] : String(price(p, i)); }
+  function cambiosPrecios() {
+    var n = 0;
+    Object.keys(state.precios).forEach(function (pid) {
+      var p = prod(pid), b = state.precios[pid];
+      if (p) Object.keys(b).forEach(function (i) { if (Number(b[i]) !== price(p, Number(i)) || b[i] === "") n++; });
+    });
+    return n;
+  }
+  function barraPreciosHTML() {
+    var n = cambiosPrecios();
+    return '<span class="note" id="p-estado">' + (state.guardandoPrecios ? "Guardando…" : n ? n + (n === 1 ? " precio sin guardar" : " precios sin guardar") : esc(state.preciosOk || "Cambia los precios y toca Guardar.")) + "</span>" +
+      '<button type="button" class="btn green" data-act="guardar-precios"' + (n && !state.guardandoPrecios ? "" : " disabled") + ">" + (state.guardandoPrecios ? "Guardando…" : "Guardar precios") + "</button>";
+  }
+  function guardarPrecios() {
+    var malos = [], local = [], nube = {};
+    Object.keys(state.precios).forEach(function (pid) {
+      var p = prod(pid), b = state.precios[pid]; if (!p) return;
+      var arr = p.opts.map(function (o, i) { return price(p, i); }), cambio = false;
+      Object.keys(b).forEach(function (k) {
+        var i = Number(k), v = Number(b[k]);
+        if (b[k] === "" || !(v >= 1 && v <= 5000) || Math.round(v) !== v) { malos.push(p.name); return; }
+        if (v !== arr[i]) { arr[i] = v; cambio = true; }
+      });
+      if (!cambio) return;
+      if (SOLO_CAJA[pid]) local.push([pid, arr]); else nube[pid] = arr;
+    });
+    if (malos.length) return toast("Revisa el precio de " + malos[0] + " (número entero de 1 a 5000)");
+    local.forEach(function (x) { var m = {}; x[1].forEach(function (v, i) { m[i] = v; }); db.settings.prices[x[0]] = m; });
+    if (local.length) save();
+    var listo = function () { state.precios = {}; state.guardandoPrecios = false; state.preciosOk = "✓ Guardado a las " + hora(new Date().toISOString()); render(); };
+    if (!Object.keys(nube).length) { listo(); return toast("Precios guardados en este iPad"); }
+    state.guardandoPrecios = true; render();
+    guardarCatalogo(function (c) { Object.keys(nube).forEach(function (pid) { c.precios[pid] = nube[pid]; }); }, "✓ Precios guardados: ya cambiaron en el menú web")
+      .then(listo).catch(function () { state.guardandoPrecios = false; render(); });
+  }
+
   function settingsHTML() {
     var rows = PRODUCTS.filter(function (p) { return !p.extra; }).map(function (p) {
       if (!sellable(p) && p.disponible !== false) {
@@ -870,7 +912,7 @@
       }
       return p.opts.map(function (o, i) {
         return "<tr><td>" + (i === 0 ? "<b>" + esc(p.name) + "</b>" : "") + (p.opts.length > 1 ? " <span class='note'>" + esc(o[0]) + "</span>" : "") + "</td>" +
-          '<td class="r"><input type="number" inputmode="decimal" data-price="' + p.id + '" data-opt="' + i + '" value="' + price(p, i) + '"></td>' +
+          '<td class="r"><input type="number" inputmode="numeric" data-price="' + p.id + '" data-opt="' + i + '" value="' + esc(precioBorrador(p, i)) + '"' + (precioBorrador(p, i) !== String(price(p, i)) ? ' class="cambio"' : "") + "></td>" +
           '<td class="r">' + (i === 0 ? '<button type="button" class="chk' + (agotado(p.id) ? " on" : "") + '" data-out="' + p.id + '">' + (agotado(p.id) ? "Agotado" : "Disponible") + "</button>" : "") + "</td></tr>";
       }).join("");
     }).join("");
@@ -878,7 +920,8 @@
       "<h3>Horario del local</h3>" + horarioHTML() +
       "<h3>Precios y disponibilidad</h3>" +
       '<div class="card prices"><table><tr><th>Producto</th><th class="r">Precio</th><th class="r"></th></tr>' + rows + "</table>" +
-      '<p class="note">Se guarda al salir de cada casilla y cambia también en el menú web (hace falta internet). La cerveza es solo de la caja: se guarda en este iPad.</p></div>' +
+      '<p class="note">Escribe los precios nuevos (se marcan en amarillo) y toca <b>Guardar precios</b>: cambian también en el menú web (hace falta internet). La cerveza es solo de la caja: se guarda en este iPad. Disponible / Agotado se guarda al tocarlo.</p>' +
+      '<div class="p-save" id="p-save">' + barraPreciosHTML() + "</div></div>" +
       "<h3>Tema del menú web</h3>" +
       '<div class="card"><button type="button" class="chk' + (db.catalogo.tema === "muertos" ? " on" : "") + '" data-act="tema">' + (db.catalogo.tema === "muertos" ? "Día de Muertos activado" : "Día de Muertos desactivado") + "</button>" +
       '<p class="note">Cambia cómo se ve el menú para los clientes (hace falta internet). La caja se ve igual.</p></div>' +
@@ -1125,6 +1168,7 @@
         .then(function () { state.hForm = null; render(); }).catch(function () {});
     }
     if (find(t, '[data-act="tema"]')) { var tema = db.catalogo.tema === "muertos" ? "" : "muertos"; return guardarCatalogo(function (c) { c.tema = tema; }, tema ? "Tema de Día de Muertos activado" : "Tema de Día de Muertos desactivado").catch(function () {}); }
+    if (find(t, '[data-act="guardar-precios"]')) { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); return guardarPrecios(); }
     if (find(t, '[data-act="mute"]')) { db.settings.mute = !db.settings.mute; save(); if (!db.settings.mute) beep(); return render(); }
 
     /* ventana de opciones */
@@ -1361,6 +1405,15 @@
     if (state.prodForm && t.id === "pf-price") state.prodForm.price = t.value;
     var pfi = state.promoForm, PRI = { "pr-nombre": "nombre", "pr-qty": "qty", "pr-precio": "precio", "pr-cupo": "cupo", "pr-texto": "texto" };
     if (pfi && PRI[t.id]) pfi[PRI[t.id]] = t.value;
+    /* precio escrito: queda de borrador hasta tocar Guardar precios (se actualiza la barra sin redibujar, para no perder el teclado) */
+    if (t.getAttribute("data-price")) {
+      var bp = prod(t.getAttribute("data-price")), bo = Number(t.getAttribute("data-opt"));
+      if (!state.precios[bp.id]) state.precios[bp.id] = {};
+      state.precios[bp.id][bo] = t.value.trim();
+      t.className = t.value.trim() !== String(price(bp, bo)) ? "cambio" : "";
+      state.preciosOk = "";
+      var bar = $("p-save"); if (bar) bar.innerHTML = barraPreciosHTML();
+    }
   });
   document.addEventListener("change", function (e) {
     var t = e.target;
@@ -1378,22 +1431,7 @@
       guardarHorario(function (h) { h.semana[hi] = nt; }, "Horario del " + DIAS_H[hi].toLowerCase() + " guardado").catch(function () {});
       return;
     }
-    if (t.getAttribute("data-price") && !SOLO_CAJA[t.getAttribute("data-price")]) {
-      var cp = prod(t.getAttribute("data-price")), co = Number(t.getAttribute("data-opt")), cv = Number(t.value);
-      if (t.value === "" || !(cv >= 1 && cv <= 5000)) { t.value = price(cp, co); toast("Precio no válido (de 1 a 5000)"); return; }
-      var arr = cp.opts.map(function (x, i) { return price(cp, i); }); arr[co] = Math.round(cv);
-      if (arr[co] === price(cp, co)) return;
-      guardarCatalogo(function (c) { c.precios[cp.id] = arr; }, "Precio guardado: también cambió en el menú web").catch(function () {});
-      return;
-    }
-    if (t.getAttribute("data-price")) {
-      var pid = t.getAttribute("data-price"), o = Number(t.getAttribute("data-opt"));
-      if (!db.settings.prices[pid]) db.settings.prices[pid] = {};
-      var v = Number(t.value);
-      if (t.value === "" || isNaN(v) || v < 0) { delete db.settings.prices[pid][o]; t.value = price(prod(pid), o); }
-      else db.settings.prices[pid][o] = Math.round(v);
-      save(); toast("Precio guardado");
-    }
+    if (t.getAttribute("data-price")) return;   /* los precios se guardan con el botón Guardar precios */
     if (t.id === "wa") { db.settings.wa = t.value.replace(/\D/g, ""); save(); toast("Número guardado"); }
   });
 

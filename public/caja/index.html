@@ -233,6 +233,12 @@ td.r, th.r { text-align: right; }
 }
 .field textarea { height: 120px; font-family: Menlo, monospace; font-size: 16px; }
 .prices td input { width: 90px; font-size: 16px; padding: 8px; border-radius: 8px; border: 1px solid var(--line); text-align: right; background: #fffdf8; }
+.prices td input.cambio { background: #fff3c4; border-color: #e0a800; font-weight: 700; }
+/* barra de Guardar precios: se queda pegada abajo mientras se baja por la lista */
+.p-save { position: -webkit-sticky; position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; margin: 10px -14px -12px; padding: 10px 14px; background: var(--card); border-top: 1px solid var(--line); border-radius: 0 0 14px 14px; }
+.p-save .note { margin: 0 10px 0 0; font-weight: 700; }
+.p-save .btn { flex: none; width: auto; padding: 12px 20px; }
+.p-save .btn[disabled] { opacity: .45; }
 .chk { border: 1px solid var(--line); background: var(--tint); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
 .chk.on { background: var(--err); color: #fff; border-color: var(--err); }
 /* productos nuevos (Ajustes) */

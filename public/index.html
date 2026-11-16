@@ -2059,6 +2059,8 @@ function consultarSeguimiento() {
     });
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { if (seg) consultarSeguimiento(); cargarCatalogo(); cargarPromos(); } });
+/* precios, agotados y horario que cambie la caja llegan solos, cada minuto, mientras el menú está a la vista */
+setInterval(() => { if (!document.hidden) cargarCatalogo(); }, 60000);
 function pasosHTML(p) {
   if (p.estado === "rechazado") return `<div class="seg-cancel">El negocio canceló tu pedido. Si tienes dudas, llámanos al <a href="tel:4493607239">449 360 7239</a>.</div>`;
   const i = PASOS_SEG.indexOf(p.estado);
